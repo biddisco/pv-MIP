@@ -315,15 +315,37 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
   // We need the transform that reflects the transform point coordinates according to actor's transformation matrix
   //
   vtkCamera *cam = ren->GetActiveCamera();
+  vtkTransform *transform = vtkTransform::New();
+  transform->SetMatrix( cam->GetCompositeProjectionTransformMatrix( 
+    ren->GetTiledAspectRatio(), 0, 1 ) 
+    );
   double zmin,zmax;
   ren->GetActiveCamera()->GetClippingRange(zmin, zmax);
-  ren->ComputeAspect();
-  double *aspect = ren->GetAspect();
-  vtkTransform *transform = vtkTransform::New();
-  transform->SetMatrix( cam->GetCompositeProjectionTransformMatrix( aspect[0]/aspect[1], zmin, zmax ) );
+
+  vtkMatrix4x4 *matrix = vtkMatrix4x4::New();
+  matrix->DeepCopy(ren->GetActiveCamera()
+    ->GetCompositeProjectionTransformMatrix(
+    ren->GetTiledAspectRatio(),0,1));
+
+  // viewport info
+  double viewPortRatio[2];
+  int sizex,sizey;
+
+  /* get physical window dimensions */
+  if ( ren->GetVTKWindow() ) {
+    double *viewPort = ren->GetViewport();
+    sizex = ren->GetVTKWindow()->GetSize()[0];
+    sizey = ren->GetVTKWindow()->GetSize()[1];
+    viewPortRatio[0] = (sizex*(viewPort[2]-viewPort[0])) / 2.0 +
+        sizex*viewPort[0];
+    viewPortRatio[1] = (sizey*(viewPort[3]-viewPort[1])) / 2.0 +
+        sizey*viewPort[1];
+  }
+
+  double view[4];
+  double pos[2];
 
   std::vector<double> mipValues(X*Y, VTK_DOUBLE_MIN);
-  vtkIdType activeParticles = 0;
   for (vtkIdType i=0; i<N; i++) {
     // what particle type is this
     int ptype = TypeArray ? TypeArray->GetTuple1(i) : 0;
@@ -334,12 +356,27 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     if (!active) continue;
 
     // if we are active, transform the point and do the mip comparison
-    double *p = transform->TransformPoint( pts->GetPoint(i) );
-    int ix = static_cast<int>(X/2 + 2.0*X*p[0] + 0.5);
-    int iy = static_cast<int>(Y/2 + 2.0*Y*p[1] + 0.5);
+    double *p = pts->GetPoint(i);
+
+    // convert from world to view
+    view[0] = p[0]*matrix->Element[0][0] + p[1]*matrix->Element[0][1] +
+      p[2]*matrix->Element[0][2] + matrix->Element[0][3];
+    view[1] = p[0]*matrix->Element[1][0] + p[1]*matrix->Element[1][1] +
+      p[2]*matrix->Element[1][2] + matrix->Element[1][3];
+    view[2] = p[0]*matrix->Element[2][0] + p[1]*matrix->Element[2][1] +
+      p[2]*matrix->Element[2][2] + matrix->Element[2][3];
+    view[3] = p[0]*matrix->Element[3][0] + p[1]*matrix->Element[3][1] +
+      p[2]*matrix->Element[3][2] + matrix->Element[3][3];
+    if (view[3] != 0.0) {
+      pos[0] = view[0]/view[3];
+      pos[1] = view[1]/view[3];
+    }
+
+    int ix = static_cast<int>((pos[0] + 1.0) * viewPortRatio[0] + 0.5);
+    int iy = static_cast<int>((pos[1] + 1.0) * viewPortRatio[1] + 0.5);
     if (ix>=0 && ix<X && iy>=0 && iy<Y) {
       double scalar = scalars->GetTuple1(i);
-      double    mip = mipValues[ix+iy*X];
+      double    mip = mipValues[ix + iy*X];
       if (scalar>mip) {
         mipValues[ix + iy*X] = scalar;
       }
@@ -360,15 +397,17 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     // map mipped scalar values to RGB colours using lookuptable
     // we do one lookup per final pixel, except empty pixels
     //
+    RGB_tuple<double> background;
+    ren->GetBackground(&background.r);
     for (int ix=0; ix<X; ix++) {
       for (int iy=0; iy<Y; iy++) {
         double pixval = mipValues[ix + iy*X];
         RGB_tuple<float> &rgbVal = mipImage[ix + iy*X];
         //
         if (pixval==VTK_DOUBLE_MIN) {
-          rgbVal.r = 0.5;
-          rgbVal.g = 0.5;
-          rgbVal.b = 0.5;
+          rgbVal.r = background.r;
+          rgbVal.g = background.g;
+          rgbVal.b = background.b;
         }
         else {
           unsigned char *rgba = this->LookupTable->MapValue(pixval);
@@ -392,7 +431,7 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     glLoadIdentity();
 
 //    for (int i=0; i<Y; i++) {
-      glRasterPos2i(0, 0);
+      glRasterPos3f(0, 0, -0.999);
       RGB_tuple<float> *ptr = &mipImage[0];
       float *x0 = &ptr->r;
       glDrawPixels(X, Y, (GLenum)(GL_RGB), (GLenum)(GL_FLOAT), (GLvoid*)(x0));
