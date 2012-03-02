@@ -1,0 +1,246 @@
+<ServerManagerConfiguration>
+
+  <!-- ================================================================= -->
+
+  <ProxyGroup name="representations">
+
+    <!-- ================================================================= -->
+    <!-- Add to "GeometryRepresentation" -->
+    <Extension name="GeometryRepresentation">
+
+      <!-- this adds to what is already defined in PVRepresentationBase -->
+      <RepresentationType subproxy="MIPRepresentation" 
+                          text="MIP (particles)"
+                          subtype="Points" />
+
+      <SubProxy>
+        <Proxy name="MIPRepresentation"
+               proxygroup="representations" 
+               proxyname="MIPRepresentation" />
+
+        <ShareProperties subproxy="SurfaceRepresentation">
+          <Exception name="Input" />
+          <Exception name="Visibility" />
+          <Exception name="Representation" />
+        </ShareProperties>
+
+        <ExposedProperties>
+          <Property name="Brightness"/>
+          <Property name="GrayAbsorption"/>
+          <Property name="LogIntensity"/>
+          <Property name="TypeActive"/>
+          <Property name="ActiveParticleType"/>
+          <Property name="ActiveParticleSettings"/>
+          <Property name="IntensityScalars"/>
+          <Property name="RadiusScalars"/>
+          <Property name="TypeScalars"/>
+          <Property name="ActiveScalars"/>
+        </ExposedProperties>
+      </SubProxy>
+    </Extension>
+    
+    <!-- ================================================================= -->
+    <!-- Add to "GeometryRepresentation" -->
+    <!-- this adds to what is already defined in PVRepresentationBase -->
+    <Extension name="UnstructuredGridRepresentation">
+
+      <!-- this adds to what is already defined in PVRepresentationBase -->
+      <RepresentationType subproxy="MIPRepresentation"
+                          text="MIP (particles)"
+                          subtype="Points" />
+
+      <SubProxy>
+        <Proxy name="MIPRepresentation"
+               proxygroup="representations" 
+               proxyname="MIPRepresentation" />
+
+        <ShareProperties subproxy="SurfaceRepresentation">
+          <Exception name="Input" />
+          <Exception name="Visibility" />
+          <Exception name="Representation" />
+        </ShareProperties>
+
+        <ExposedProperties>
+          <Property name="Brightness"/>
+          <Property name="GrayAbsorption"/>
+          <Property name="LogIntensity"/>
+          <Property name="TypeActive"/>
+          <Property name="ActiveParticleType"/>
+          <Property name="ActiveParticleSettings"/>
+          <Property name="IntensityScalars"/>
+          <Property name="RadiusScalars"/>
+          <Property name="TypeScalars"/>
+          <Property name="ActiveScalars"/>
+        </ExposedProperties>
+      </SubProxy>
+    </Extension>
+
+    <!-- ================================================================= -->
+    <RepresentationProxy name="MIPRepresentation"    
+                         base_proxygroup="representations"      
+                         base_proxyname="SurfaceRepresentationBase"      
+                         class="vtkMIPRepresentation"      
+                         processes="client|dataserver|renderserver" >
+
+      <Documentation>
+        Representation for Particle or Point Data.
+      </Documentation>
+
+      <InputProperty name="Input" command="SetInputConnection">
+        <DataTypeDomain name="input_type">
+          <DataType value="vtkPointSet"/>
+        </DataTypeDomain>
+        <InputArrayDomain name="input_array" attribute_type="point">
+        </InputArrayDomain>
+      </InputProperty>
+
+      <IntVectorProperty name="ActiveParticleType"
+        command="SetActiveParticleType"
+        number_of_elements="1"
+        default_values="0">
+      </IntVectorProperty>-->
+
+      <StringVectorProperty
+         name="ActiveParticleSettings"
+         command="GetActiveParticleSettings"
+         information_only="1">
+        <StringArrayHelper/>
+      </StringVectorProperty>
+
+
+      <DoubleVectorProperty name="Brightness"
+        command="SetBrightness"
+        number_of_elements="1"
+        default_values="102">
+        <DoubleRangeDomain name="range" min="-500" max="500"/>
+        <Documentation>
+          The value passed to the mapper is 10^(Brighness/100)
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty name="GrayAbsorption"
+        command="SetGrayAbsorption"
+        number_of_elements="1"
+        default_values="-400">
+        <DoubleRangeDomain name="range" min="-500" max="0"/>
+        <Documentation>
+          The value passed to the mapper is 10^(GrayAbsorption/100)
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <IntVectorProperty name="LogIntensity"
+        command="SetLogIntensity"
+        number_of_elements="1"
+        default_values="1">
+        <BooleanDomain name="bool"/>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="TypeActive"
+        command="SetTypeActive"
+        number_of_elements="1"
+        default_values="1">
+        <BooleanDomain name="bool"/>
+      </IntVectorProperty>
+
+      <StringVectorProperty
+         name="IntensityScalars"
+         command="SetInputArrayToProcess"
+         default_values="0"
+         number_of_elements="5"
+         element_types="0 0 0 0 2">
+        <ArrayListDomain 
+          name="array_list" 
+          attribute_type="Scalars"
+          none_string="Not available"
+          input_domain_name="input_array">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </ArrayListDomain>
+        <FieldDataDomain name="field_list"
+                         disable_update_domain_entries="1">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </FieldDataDomain>
+        <Documentation>
+          Scalars to use for Intensity
+        </Documentation>
+      </StringVectorProperty>
+
+      <StringVectorProperty
+        name="RadiusScalars"
+        command="SetInputArrayToProcess"
+        animateable="0"
+        default_values="1"
+        number_of_elements="5"
+        element_types="0 0 0 0 2">
+        <ArrayListDomain 
+          name="array_list" 
+          attribute_type="Scalars"
+          none_string="Not available"
+          input_domain_name="input_array">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </ArrayListDomain>
+        <FieldDataDomain name="field_list"
+                         disable_update_domain_entries="1">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </FieldDataDomain>
+      </StringVectorProperty>
+
+      <StringVectorProperty
+        name="TypeScalars"
+        command="SetInputArrayToProcess"
+        animateable="0"
+        default_values="2"
+        number_of_elements="5"
+        element_types="0 0 0 0 2">
+        <ArrayListDomain
+          name="array_list"
+          attribute_type="Scalars"
+          none_string="Not available"
+          input_domain_name="input_array">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </ArrayListDomain>
+        <FieldDataDomain name="field_list"
+                         disable_update_domain_entries="1">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </FieldDataDomain>
+      </StringVectorProperty>
+
+      <StringVectorProperty
+        name="ActiveScalars"
+        command="SetInputArrayToProcess"
+        animateable="0"
+        default_values="3"
+        number_of_elements="5"
+        element_types="0 0 0 0 2">
+        <ArrayListDomain
+          name="array_list"
+          attribute_type="Scalars"
+          none_string="Not available"
+          input_domain_name="input_array">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </ArrayListDomain>
+        <FieldDataDomain name="field_list"
+                         disable_update_domain_entries="1">
+          <RequiredProperties>
+            <Property name="Input" function="Input"/>
+          </RequiredProperties>
+        </FieldDataDomain>
+      </StringVectorProperty>
+
+    </RepresentationProxy>
+
+  </ProxyGroup>
+</ServerManagerConfiguration>
