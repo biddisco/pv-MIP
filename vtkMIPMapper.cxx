@@ -385,7 +385,8 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     //      pref.I   = intensityarrays[pref.type] ? intensityarrays[pref.type]->GetTuple1(i) : 1.0;
   }
 
-  this->Controller->AllReduce(&mipValues[0], &mipValues[0], X*Y, vtkCommunicator::MAX_OP);
+  std::vector<double> mipCollected(X*Y, VTK_DOUBLE_MIN);
+  this->Controller->AllReduce(&mipValues[0], &mipCollected[0]/*(double*)MPI_IN_PLACE*/, X*Y, vtkCommunicator::MAX_OP);
 
   // only convert to colours on master process
   if (this->Controller->GetLocalProcessId()==0) {
@@ -401,13 +402,16 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     ren->GetBackground(&background.r);
     for (int ix=0; ix<X; ix++) {
       for (int iy=0; iy<Y; iy++) {
-        double pixval = mipValues[ix + iy*X];
+        double pixval = mipCollected[ix + iy*X];
         RGB_tuple<float> &rgbVal = mipImage[ix + iy*X];
         //
         if (pixval==VTK_DOUBLE_MIN) {
           rgbVal.r = background.r;
           rgbVal.g = background.g;
           rgbVal.b = background.b;
+          rgbVal.r = 0.2;
+          rgbVal.g = 0.2;
+          rgbVal.b = 0.2;
         }
         else {
           unsigned char *rgba = this->LookupTable->MapValue(pixval);

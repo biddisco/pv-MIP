@@ -38,8 +38,8 @@ vtkMIPRepresentation::vtkMIPRepresentation()
 {
   this->MIPMapper    = vtkMIPMapper::New();
   this->Mapper       = this->MIPMapper;
-  this->LODMIPMapper = NULL;
-  this->LODMapper    = vtkPolyDataMapper::New();
+  this->LODMIPMapper = vtkMIPMapper::New();
+  this->LODMapper    = this->LODMIPMapper;
 
 //  this->GrayAbsorption = 0.0001;
 //  this->Brightness = 10.5;
