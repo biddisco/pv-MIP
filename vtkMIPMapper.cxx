@@ -45,7 +45,6 @@
 #include "vtkTransform.h"
 //
 #ifdef VTK_USE_MPI
-#include "vtkMPI.h"
 #include "vtkMPICommunicator.h"
 #endif
 #include "vtkMultiProcessController.h"
