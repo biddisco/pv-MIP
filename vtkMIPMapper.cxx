@@ -408,9 +408,6 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
           rgbVal.r = background.r;
           rgbVal.g = background.g;
           rgbVal.b = background.b;
-          rgbVal.r = 0.2;
-          rgbVal.g = 0.2;
-          rgbVal.b = 0.2;
         }
         else {
           unsigned char *rgba = this->LookupTable->MapValue(pixval);
@@ -433,12 +430,11 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-//    for (int i=0; i<Y; i++) {
-      glRasterPos3f(0, 0, -0.999);
-      RGB_tuple<float> *ptr = &mipImage[0];
-      float *x0 = &ptr->r;
-      glDrawPixels(X, Y, (GLenum)(GL_RGB), (GLenum)(GL_FLOAT), (GLvoid*)(x0));
-//    }
+    // we draw our image just in front of the back clipping plane, 
+    // so all other geometry will appear in front of it.
+    glRasterPos3f(0, 0, -0.99999);
+    float *x0 = &mipImage[0].r;
+    glDrawPixels(X, Y, (GLenum)(GL_RGB), (GLenum)(GL_FLOAT), (GLvoid*)(x0));
 
     glMatrixMode( GL_PROJECTION );
     glPopMatrix();
