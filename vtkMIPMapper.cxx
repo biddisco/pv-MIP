@@ -281,15 +281,6 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
   vtkPoints *pts = input->GetPoints();
   vtkSmartPointer<vtkPoints> transformedpts = vtkSmartPointer<vtkPoints>::New();
   //
-  std::vector<vtkDataArray *> radiusarrays(this->NumberOfParticleTypes);
-  std::vector<vtkDataArray *> intensityarrays(this->NumberOfParticleTypes);
-  for (int i=0; i<this->NumberOfParticleTypes; i++) {
-    radiusarrays[i] = (this->RadiusScalars[i].size()>0) ? 
-      input->GetPointData()->GetArray(this->RadiusScalars[i].c_str()) : NULL;
-    intensityarrays[i] = (this->IntensityScalars[i].size()>0) ? 
-      input->GetPointData()->GetArray(this->IntensityScalars[i].c_str()) : NULL;  
-  }
-  //
   vtkDataArray *TypeArray = this->TypeScalars ? 
     input->GetPointData()->GetArray(this->TypeScalars) : NULL;  
   //
@@ -373,15 +364,26 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
 
     int ix = static_cast<int>((pos[0] + 1.0) * viewPortRatio[0] + 0.5);
     int iy = static_cast<int>((pos[1] + 1.0) * viewPortRatio[1] + 0.5);
+    int C = scalars->GetNumberOfComponents();
+    double *tuple=new double[C];
+    bool magnitude = (C>1);
+    double scalar=0, mip;
+
     if (ix>=0 && ix<X && iy>=0 && iy<Y) {
-      double scalar = scalars ? scalars->GetTuple1(i) : 0;
-      double    mip = mipValues[ix + iy*X];
+      if (scalars && !magnitude) {
+        scalar = scalars->GetTuple1(i);
+        mip = mipValues[ix + iy*X];
+      }
+      else if (scalars && magnitude) {
+        scalars->GetTuple(i,tuple);
+        scalar = vtkMath::Norm(tuple,C);
+        mip = mipValues[ix + iy*X];
+      }
       if (scalar>mip) {
         mipValues[ix + iy*X] = scalar;
       }
     }
-    //      pref.r      = radiusarrays[pref.type] ? radiusarrays[pref.type]->GetTuple1(i) : radius;
-    //      pref.I   = intensityarrays[pref.type] ? intensityarrays[pref.type]->GetTuple1(i) : 1.0;
+    delete [] tuple;
   }
 
   std::vector<double> mipCollected(X*Y, VTK_DOUBLE_MIN);
@@ -428,17 +430,18 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     glLoadIdentity();
     glOrtho(viewport[0], viewport[2], viewport[1], viewport[3], -1, 1);
     glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
     glLoadIdentity();
 
     // we draw our image just in front of the back clipping plane, 
     // so all other geometry will appear in front of it.
-    glRasterPos3f(0, 0, -0.99999);
+    glRasterPos3f(0, 0, -0.99);
     float *x0 = &mipImage[0].r;
     glDrawPixels(X, Y, (GLenum)(GL_RGB), (GLenum)(GL_FLOAT), (GLvoid*)(x0));
 
-    glMatrixMode( GL_PROJECTION );
-    glPopMatrix();
     glMatrixMode( GL_MODELVIEW );   
+    glPopMatrix();
+    glMatrixMode( GL_PROJECTION );
     glPopMatrix();
   }
 }
