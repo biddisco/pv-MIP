@@ -374,7 +374,7 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     int ix = static_cast<int>((pos[0] + 1.0) * viewPortRatio[0] + 0.5);
     int iy = static_cast<int>((pos[1] + 1.0) * viewPortRatio[1] + 0.5);
     if (ix>=0 && ix<X && iy>=0 && iy<Y) {
-      double scalar = scalars->GetTuple1(i);
+      double scalar = scalars ? scalars->GetTuple1(i) : 0;
       double    mip = mipValues[ix + iy*X];
       if (scalar>mip) {
         mipValues[ix + iy*X] = scalar;
