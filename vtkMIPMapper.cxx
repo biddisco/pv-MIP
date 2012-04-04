@@ -342,8 +342,8 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     // clamp it to prevent array access faults
     ptype = ptype<this->NumberOfParticleTypes ? ptype : 0;
     // is this particle active, if not skip it
-    bool active = this->TypeActive[ptype] && (ActiveArray ? (ActiveArray->GetTuple1(i)!=0) : 1);
-    if (!active) continue;
+//    bool active = this->TypeActive[ptype] && (ActiveArray ? (ActiveArray->GetTuple1(i)!=0) : 1);
+//    if (!active) continue;
 
     // if we are active, transform the point and do the mip comparison
     double *p = pts->GetPoint(i);
@@ -387,7 +387,7 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
   }
 
   std::vector<double> mipCollected(X*Y, VTK_DOUBLE_MIN);
-  this->Controller->AllReduce(&mipValues[0], &mipCollected[0]/*(double*)MPI_IN_PLACE*/, X*Y, vtkCommunicator::MAX_OP);
+  this->Controller->Reduce(&mipValues[0], &mipCollected[0]/*(double*)MPI_IN_PLACE*/, X*Y, vtkCommunicator::MAX_OP, 0);
 
   // only convert to colours on master process
   if (this->Controller->GetLocalProcessId()==0) {
