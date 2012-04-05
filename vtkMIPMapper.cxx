@@ -43,6 +43,7 @@
 #include "vtkStreamingDemandDrivenPipeline.h"
 #include "vtkTimerLog.h"
 #include "vtkTransform.h"
+#include "vtkMPICompositeManager.h"
 //
 #ifdef VTK_USE_MPI
 #include "vtkMPICommunicator.h"
@@ -126,7 +127,6 @@ vtkMIPMapper::vtkMIPMapper()
   this->ActiveScalars    = NULL;
   this->NumberOfParticleTypes = 0;
   this->SetNumberOfParticleTypes(1); 
-  this->GrayAbsorption = 0.001;
   this->Controller = NULL;
   this->SetController(vtkMultiProcessController::GetGlobalController());
 }
@@ -177,64 +177,7 @@ void vtkMIPMapper::GetBounds(double *bounds)
 void vtkMIPMapper::SetNumberOfParticleTypes(int N)
 {
   this->NumberOfParticleTypes = std::max(N,this->NumberOfParticleTypes);
-  this->IntensityScalars.resize(this->NumberOfParticleTypes,"");
-  this->RadiusScalars.resize(this->NumberOfParticleTypes,"");
-  this->Brightness.resize(this->NumberOfParticleTypes,10.5);
-  this->LogIntensity.resize(this->NumberOfParticleTypes,0);
   this->TypeActive.resize(this->NumberOfParticleTypes,0);
-  this->LogColour.resize(this->NumberOfParticleTypes,0);
-}
-// ---------------------------------------------------------------------------
-void vtkMIPMapper::SetIntensityScalars(int ptype, const char *s)
-{
-  if (std::string(s)!=this->IntensityScalars[ptype]) {
-    this->IntensityScalars[ptype] = s;
-    this->Modified();
-  }
-}
-// ---------------------------------------------------------------------------
-const char *vtkMIPMapper::GetIntensityScalars(int ptype)
-{
-  return this->IntensityScalars[ptype].c_str();
-}
-// ---------------------------------------------------------------------------
-void vtkMIPMapper::SetRadiusScalars(int ptype, const char *s)
-{
-  if (std::string(s)!=this->RadiusScalars[ptype]) {
-    this->RadiusScalars[ptype] = s;
-    this->Modified();
-  }
-}
-// ---------------------------------------------------------------------------
-const char *vtkMIPMapper::GetRadiusScalars(int ptype)
-{
-  return this->RadiusScalars[ptype].c_str();
-}
-// ---------------------------------------------------------------------------
-void vtkMIPMapper::SetBrightness(int ptype, double b)
-{
-  if (b!=this->Brightness[ptype]) {
-    this->Brightness[ptype] = b;
-    this->Modified();
-  }
-}
-// ---------------------------------------------------------------------------
-double vtkMIPMapper::GetBrightness(int ptype)
-{
-  return this->Brightness[ptype];
-}
-// ---------------------------------------------------------------------------
-void vtkMIPMapper::SetLogIntensity(int ptype, int l)
-{
-  if (l!=this->LogIntensity[ptype]) {
-    this->LogIntensity[ptype] = l;
-    this->Modified();
-  }
-}
-// ---------------------------------------------------------------------------
-int vtkMIPMapper::GetLogIntensity(int ptype)
-{
-  return this->LogIntensity[ptype];
 }
 // ---------------------------------------------------------------------------
 void vtkMIPMapper::SetTypeActive(int ptype, int a)
@@ -248,29 +191,6 @@ void vtkMIPMapper::SetTypeActive(int ptype, int a)
 int vtkMIPMapper::GetTypeActive(int ptype)
 {
   return this->TypeActive[ptype];
-}
-// ---------------------------------------------------------------------------
-// don't need this?
-void vtkMIPMapper::SetLogColour(int ptype, int l)
-{
-  if (l!=this->LogColour[ptype]) {
-    this->LogColour[ptype] = l;
-    this->Modified();
-  }
-}
-// ---------------------------------------------------------------------------
-int vtkMIPMapper::GetLogColour(int ptype)
-{
-  return this->LogColour[ptype];
-}
-// ---------------------------------------------------------------------------
-template <typename T>
-std::string NumToStrSPM(T data) {
-  vtksys_ios::ostringstream oss;
-//  oss.setf(0,ios::floatfield);
-  oss.precision(5);  
-  oss << data;
-  return oss.str();
 }
 // ---------------------------------------------------------------------------
 void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
@@ -317,20 +237,18 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     ->GetCompositeProjectionTransformMatrix(
     ren->GetTiledAspectRatio(),0,1));
 
+  // size of final image
+  int viewsize[2], vieworigin[2];
+  ren->GetTiledSizeAndOrigin( &viewsize[0],   &viewsize[1], 
+                              &vieworigin[0], &vieworigin[1] );
+
   // viewport info
   double viewPortRatio[2];
-  int sizex,sizey;
-
-  /* get physical window dimensions */
-  if ( ren->GetVTKWindow() ) {
-    double *viewPort = ren->GetViewport();
-    sizex = ren->GetVTKWindow()->GetSize()[0];
-    sizey = ren->GetVTKWindow()->GetSize()[1];
-    viewPortRatio[0] = (sizex*(viewPort[2]-viewPort[0])) / 2.0 +
-        sizex*viewPort[0];
-    viewPortRatio[1] = (sizey*(viewPort[3]-viewPort[1])) / 2.0 +
-        sizey*viewPort[1];
-  }
+  double *viewPort = ren->GetViewport();
+  viewPortRatio[0] = (viewsize[0]*(viewPort[2]-viewPort[0])) / 2.0 +
+      viewsize[0]*viewPort[0];
+  viewPortRatio[1] = (viewsize[1]*(viewPort[3]-viewPort[1])) / 2.0 +
+      viewsize[1]*viewPort[1];
 
   double view[4];
   double pos[2];
@@ -342,8 +260,8 @@ void vtkMIPMapper::Render(vtkRenderer *ren, vtkActor *actor)
     // clamp it to prevent array access faults
     ptype = ptype<this->NumberOfParticleTypes ? ptype : 0;
     // is this particle active, if not skip it
-//    bool active = this->TypeActive[ptype] && (ActiveArray ? (ActiveArray->GetTuple1(i)!=0) : 1);
-//    if (!active) continue;
+    bool active = this->TypeActive[ptype] && (ActiveArray ? (ActiveArray->GetTuple1(i)!=0) : 1);
+    if (!active) continue;
 
     // if we are active, transform the point and do the mip comparison
     double *p = pts->GetPoint(i);

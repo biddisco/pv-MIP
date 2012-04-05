@@ -124,40 +124,12 @@ vtkStringArray *vtkMIPRepresentation::GetActiveParticleSettings()
 {
   this->Settings->Initialize();
   this->Settings->SetNumberOfComponents(1);
-  this->Settings->SetNumberOfTuples(6);
-
-  this->Settings->SetValue(0, NumToStr<int>(this->ActiveParticleType).c_str());
-  this->Settings->SetValue(1, NumToStr<double>(this->GetBrightness()).c_str());
-  this->Settings->SetValue(2, NumToStr<int>(this->GetLogIntensity()).c_str());
-  this->Settings->SetValue(3, this->GetIntensityScalars());
-  this->Settings->SetValue(4, this->GetRadiusScalars());
-  this->Settings->SetValue(5, NumToStr<int>(this->GetTypeActive()).c_str());
+  this->Settings->SetNumberOfTuples(2);
   //
-
+  this->Settings->SetValue(0, NumToStr<int>(this->ActiveParticleType).c_str());
+  this->Settings->SetValue(1, NumToStr<int>(this->GetTypeActive()).c_str());
+  //
   return this->Settings;
-}
-//----------------------------------------------------------------------------
-void vtkMIPRepresentation::SetBrightness(double b)
-{
-  double value = pow(10,(b/100.0));
-  if (this->MIPMapper) this->MIPMapper->SetBrightness(this->ActiveParticleType, value);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetBrightness(this->ActiveParticleType, value);
-}
-//----------------------------------------------------------------------------
-double vtkMIPRepresentation::GetBrightness()
-{
-  return this->MIPMapper->GetBrightness(this->ActiveParticleType);
-}
-//----------------------------------------------------------------------------
-void vtkMIPRepresentation::SetLogIntensity(int l)
-{
-  if (this->MIPMapper) this->MIPMapper->SetLogIntensity(this->ActiveParticleType, l);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetLogIntensity(this->ActiveParticleType, l);
-}
-//----------------------------------------------------------------------------
-int vtkMIPRepresentation::GetLogIntensity()
-{
-  return this->MIPMapper->GetLogIntensity(this->ActiveParticleType);
 }
 //----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetTypeActive(int l)
@@ -171,39 +143,13 @@ int vtkMIPRepresentation::GetTypeActive()
   return this->MIPMapper->GetTypeActive(this->ActiveParticleType);
 }
 //----------------------------------------------------------------------------
-void vtkMIPRepresentation::SetGrayAbsorption(double g)
-{
-  double value = pow(10,(g/100.0));
-  if (this->MIPMapper) this->MIPMapper->SetGrayAbsorption(value);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetGrayAbsorption(value);
-}
-//----------------------------------------------------------------------------
-double vtkMIPRepresentation::GetGrayAbsorption()
-{
-  return this->MIPMapper->GetGrayAbsorption();
-}
-//----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetInputArrayToProcess(
   int idx, int port, int connection, int fieldAssociation, const char *name)
 {
   switch (idx) {
-    case 0: this->SetIntensityScalars(name); break;
-    case 1: this->SetRadiusScalars(name); break;
-    case 2: this->SetTypeScalars(name); break;
-    case 3: this->SetActiveScalars(name); break;
+    case 0: this->SetTypeScalars(name); break;
+    case 1: this->SetActiveScalars(name); break;
   }
-}
-//----------------------------------------------------------------------------
-void vtkMIPRepresentation::SetIntensityScalars(const char *s)
-{
-  if (this->MIPMapper) this->MIPMapper->SetIntensityScalars(this->ActiveParticleType, s);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetIntensityScalars(this->ActiveParticleType, s);
-}
-//----------------------------------------------------------------------------
-void vtkMIPRepresentation::SetRadiusScalars(const char *s)
-{
-  if (this->MIPMapper) this->MIPMapper->SetRadiusScalars(this->ActiveParticleType, s);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetRadiusScalars(this->ActiveParticleType, s);
 }
 //----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetTypeScalars(const char *s)
@@ -212,28 +158,16 @@ void vtkMIPRepresentation::SetTypeScalars(const char *s)
   if (this->LODMIPMapper) this->LODMIPMapper->SetTypeScalars(s);
 }
 //----------------------------------------------------------------------------
-void vtkMIPRepresentation::SetActiveScalars(const char *s)
-{
-  if (this->MIPMapper) this->MIPMapper->SetActiveScalars(s);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetActiveScalars(s);
-}
-//----------------------------------------------------------------------------
-const char *vtkMIPRepresentation::GetIntensityScalars()
-{
-  if (this->MIPMapper) return this->MIPMapper->GetIntensityScalars(this->ActiveParticleType);
-  return NULL;
-}
-//----------------------------------------------------------------------------
-const char *vtkMIPRepresentation::GetRadiusScalars()
-{
-  if (this->MIPMapper) return this->MIPMapper->GetRadiusScalars(this->ActiveParticleType);
-  return NULL;
-}
-//----------------------------------------------------------------------------
 const char *vtkMIPRepresentation::GetTypeScalars()
 {
   if (this->MIPMapper) return this->MIPMapper->GetTypeScalars();
   return NULL;
+}
+//----------------------------------------------------------------------------
+void vtkMIPRepresentation::SetActiveScalars(const char *s)
+{
+  if (this->MIPMapper) this->MIPMapper->SetActiveScalars(s);
+  if (this->LODMIPMapper) this->LODMIPMapper->SetActiveScalars(s);
 }
 //----------------------------------------------------------------------------
 const char *vtkMIPRepresentation::GetActiveScalars()

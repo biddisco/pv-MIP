@@ -97,7 +97,6 @@
         <StringArrayHelper/>
       </StringVectorProperty>
 
-
       <IntVectorProperty name="MIPTypeActive"
         command="SetTypeActive"
         number_of_elements="1"
@@ -107,11 +106,13 @@
 
       <StringVectorProperty
         name="MIPTypeScalars"
-        command="SetInputArrayToProcess"
+        command="SetTypeScalars"
+        number_of_elements="1"
         animateable="0"
-        default_values="2"
-        number_of_elements="5"
-        element_types="0 0 0 0 2">
+        default_values="Type"
+        default_regex_delimiter=","
+        default_regex="^[Tt]ype"
+        label="Type Array">
         <ArrayListDomain
           name="array_list"
           attribute_type="Scalars"
@@ -121,21 +122,17 @@
             <Property name="Input" function="Input"/>
           </RequiredProperties>
         </ArrayListDomain>
-        <FieldDataDomain name="field_list"
-                         disable_update_domain_entries="1">
-          <RequiredProperties>
-            <Property name="Input" function="Input"/>
-          </RequiredProperties>
-        </FieldDataDomain>
       </StringVectorProperty>
 
       <StringVectorProperty
         name="MIPActiveScalars"
-        command="SetInputArrayToProcess"
+        command="SetActiveScalars"
+        number_of_elements="1"
         animateable="0"
-        default_values="3"
-        number_of_elements="5"
-        element_types="0 0 0 0 2">
+        default_values="Active"
+        default_regex_delimiter=","
+        default_regex="^[Aa]ctiveScalars"
+        label="Active flag Array">
         <ArrayListDomain
           name="array_list"
           attribute_type="Scalars"
@@ -145,12 +142,6 @@
             <Property name="Input" function="Input"/>
           </RequiredProperties>
         </ArrayListDomain>
-        <FieldDataDomain name="field_list"
-                         disable_update_domain_entries="1">
-          <RequiredProperties>
-            <Property name="Input" function="Input"/>
-          </RequiredProperties>
-        </FieldDataDomain>
       </StringVectorProperty>
 
     </RepresentationProxy>

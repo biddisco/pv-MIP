@@ -46,26 +46,13 @@ public:
                               int fieldAssociation,
                               const char *name);
 
-  void SetIntensityScalars(const char *);
-  void SetRadiusScalars(const char *);
   void SetTypeScalars(const char *);
   void SetActiveScalars(const char *);
-  const char *GetIntensityScalars();
-  const char *GetRadiusScalars();
   const char *GetTypeScalars();
   const char *GetActiveScalars();
 
-  void   SetBrightness(double b);
-  double GetBrightness();
-
-  void   SetLogIntensity(int l);
-  int    GetLogIntensity();
-
   void   SetTypeActive(int l);
   int    GetTypeActive();
-
-  void   SetGrayAbsorption(double b);
-  double GetGrayAbsorption();
 
   // Gather all the settings in one call for feeding back to the gui display
   vtkStringArray *GetActiveParticleSettings();

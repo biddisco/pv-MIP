@@ -57,27 +57,8 @@ public:
   void SetNumberOfParticleTypes(int N);
   vtkGetMacro(NumberOfParticleTypes, int);
 
-  void SetIntensityScalars(int ptype, const char *s);
-  const char *GetIntensityScalars(int ptype);
-
-  void SetRadiusScalars(int ptype, const char *s);
-  const char *GetRadiusScalars(int ptype);
-
-  void SetBrightness(int ptype, double);
-  double GetBrightness(int ptype);
-
-  void SetLogIntensity(int ptype, int);
-  int GetLogIntensity(int ptype);
-
-  // don't need this?
-  void SetLogColour(int ptype, int);
-  int GetLogColour(int ptype);
-
   void SetTypeActive(int ptype, int);
   int GetTypeActive(int ptype);
-
-  vtkGetMacro(GrayAbsorption,double);
-  vtkSetMacro(GrayAbsorption,double);
 
   // we need to override the bounds so that IceT composites the whole image 
   // and not only the projected piece bounds from each process
@@ -100,16 +81,10 @@ protected:
 
   virtual int FillInputPortInformation(int port, vtkInformation *info);
 
-  char   *TypeScalars;
-  char   *ActiveScalars;
-  double  GrayAbsorption;
-  int     NumberOfParticleTypes;
-  std::vector<std::string> IntensityScalars;
-  std::vector<std::string> RadiusScalars;
-  std::vector<double>      Brightness;
-  std::vector<int>         LogIntensity;
-  std::vector<int>         LogColour;
-  std::vector<int>         TypeActive;
+  char             *TypeScalars;
+  char             *ActiveScalars;
+  int               NumberOfParticleTypes;
+  std::vector<int>  TypeActive;
 
   vtkMultiProcessController* Controller;
 
