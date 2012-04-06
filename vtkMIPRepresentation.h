@@ -24,7 +24,7 @@
 #include "vtkStringArray.h"
 #include "vtkSmartPointer.h"
 
-class vtkMIPMapper;
+class vtkMIPPainter;
 
 class VTK_EXPORT vtkMIPRepresentation : public vtkGeometryRepresentation
 {
@@ -72,9 +72,11 @@ protected:
   virtual int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*);
 
   //
-  vtkMIPMapper       *MIPMapper;
-  vtkMIPMapper       *LODMIPMapper;
-  int                             ActiveParticleType;
+  vtkMIPPainter  *MIPPainter;
+  vtkMIPPainter  *LODMIPPainter;
+//  vtkMIPMapper          *MIPMapper;
+//  vtkMIPMapper          *LODMIPMapper;
+  int                    ActiveParticleType;
   vtkSmartPointer<vtkStringArray> Settings;
 
 private:

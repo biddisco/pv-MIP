@@ -18,7 +18,7 @@
 
 #include "vtkCompositePolyDataMapper2.h"
 #include "vtkDataObject.h"
-#include "vtkMIPMapper.h"
+#include "vtkMIPPainter.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMPIMoveData.h"
@@ -36,29 +36,20 @@ vtkStandardNewMacro(vtkMIPRepresentation);
 //----------------------------------------------------------------------------
 vtkMIPRepresentation::vtkMIPRepresentation()
 {
-  this->MIPMapper    = vtkMIPMapper::New();
-  this->Mapper       = this->MIPMapper;
-  this->LODMIPMapper = vtkMIPMapper::New();
-  this->LODMapper    = this->LODMIPMapper;
+  this->MIPPainter    = vtkMIPPainter::New();
+  this->LODMIPPainter = vtkMIPPainter::New();
 
-//  this->GrayAbsorption = 0.0001;
-//  this->Brightness = 10.5;
-//  this->LogIntensity = 1;
   this->ActiveParticleType = 0;
 
-  this->Mapper->SetInputConnection(this->Distributor->GetOutputPort());
-  this->LODMapper->SetInputConnection(this->LODDeliveryFilter->GetOutputPort());
-
-  this->Actor->SetMapper(this->Mapper);
-  this->Actor->SetLODMapper(this->LODMapper);
-  this->Actor->SetProperty(this->Property);
+  vtkPainterPolyDataMapper::SafeDownCast(this->Mapper)->GetPainter()->SetDelegatePainter(this->MIPPainter);
+  vtkPainterPolyDataMapper::SafeDownCast(this->LODMapper)->GetPainter()->SetDelegatePainter(this->LODMIPPainter);
 
   // override some settings made in GeometryRepresentation
-  this->DeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
-  this->LODDeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
-  this->Decimator->SetCopyCellData(0);
+//  this->DeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
+//  this->LODDeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
+//  this->Decimator->SetCopyCellData(0);
   //  we don't want the MultiBlockMaker used
-  this->CacheKeeper->SetInputConnection(this->GeometryFilter->GetOutputPort());
+//  this->CacheKeeper->SetInputConnection(this->GeometryFilter->GetOutputPort());
 
   this->ColorArrayName = 0;
   this->ColorAttributeType = POINT_DATA;
@@ -77,8 +68,8 @@ vtkMIPRepresentation::vtkMIPRepresentation()
 vtkMIPRepresentation::~vtkMIPRepresentation()
 {
   // Geometry Representation base class will delete the Mapper and LODMapper which point to our classes
-  this->MIPMapper = NULL;
-  this->LODMIPMapper = NULL;
+  this->MIPPainter = NULL;
+  this->LODMIPPainter = NULL;
 }
 //----------------------------------------------------------------------------
 int vtkMIPRepresentation::FillInputPortInformation(int port,
@@ -105,8 +96,8 @@ void vtkMIPRepresentation::PrintSelf(ostream& os, vtkIndent indent)
 void vtkMIPRepresentation::SetActiveParticleType(int p)
 {
   // this only allocates space in the mapper, it does not actually set the max
-  if (this->MIPMapper) this->MIPMapper->SetNumberOfParticleTypes(p+1);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetNumberOfParticleTypes(p+1);
+  if (this->MIPPainter) this->MIPPainter->SetNumberOfParticleTypes(p+1);
+  if (this->LODMIPPainter) this->LODMIPPainter->SetNumberOfParticleTypes(p+1);
   // this is the active one
   this->ActiveParticleType = p;
 }
@@ -134,13 +125,13 @@ vtkStringArray *vtkMIPRepresentation::GetActiveParticleSettings()
 //----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetTypeActive(int l)
 {
-  if (this->MIPMapper) this->MIPMapper->SetTypeActive(this->ActiveParticleType, l);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetTypeActive(this->ActiveParticleType, l);
+  if (this->MIPPainter) this->MIPPainter->SetTypeActive(this->ActiveParticleType, l);
+  if (this->LODMIPPainter) this->LODMIPPainter->SetTypeActive(this->ActiveParticleType, l);
 }
 //----------------------------------------------------------------------------
 int vtkMIPRepresentation::GetTypeActive()
 {
-  return this->MIPMapper->GetTypeActive(this->ActiveParticleType);
+  return this->MIPPainter->GetTypeActive(this->ActiveParticleType);
 }
 //----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetInputArrayToProcess(
@@ -154,25 +145,25 @@ void vtkMIPRepresentation::SetInputArrayToProcess(
 //----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetTypeScalars(const char *s)
 {
-  if (this->MIPMapper) this->MIPMapper->SetTypeScalars(s);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetTypeScalars(s);
+  if (this->MIPPainter) this->MIPPainter->SetTypeScalars(s);
+  if (this->LODMIPPainter) this->LODMIPPainter->SetTypeScalars(s);
 }
 //----------------------------------------------------------------------------
 const char *vtkMIPRepresentation::GetTypeScalars()
 {
-  if (this->MIPMapper) return this->MIPMapper->GetTypeScalars();
+  if (this->MIPPainter) return this->MIPPainter->GetTypeScalars();
   return NULL;
 }
 //----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetActiveScalars(const char *s)
 {
-  if (this->MIPMapper) this->MIPMapper->SetActiveScalars(s);
-  if (this->LODMIPMapper) this->LODMIPMapper->SetActiveScalars(s);
+  if (this->MIPPainter) this->MIPPainter->SetActiveScalars(s);
+  if (this->LODMIPPainter) this->LODMIPPainter->SetActiveScalars(s);
 }
 //----------------------------------------------------------------------------
 const char *vtkMIPRepresentation::GetActiveScalars()
 {
-  if (this->MIPMapper) return this->MIPMapper->GetActiveScalars();
+  if (this->MIPPainter) return this->MIPPainter->GetActiveScalars();
   return NULL;
 }
 //----------------------------------------------------------------------------
