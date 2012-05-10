@@ -18,6 +18,7 @@
 
 #include "vtkCompositePolyDataMapper2.h"
 #include "vtkDataObject.h"
+#include "vtkDefaultPainter.h"
 #include "vtkMIPPainter.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
@@ -43,7 +44,10 @@ vtkMIPRepresentation::vtkMIPRepresentation()
 
   vtkPainterPolyDataMapper::SafeDownCast(this->Mapper)->GetPainter()->SetDelegatePainter(this->MIPPainter);
   vtkPainterPolyDataMapper::SafeDownCast(this->LODMapper)->GetPainter()->SetDelegatePainter(this->LODMIPPainter);
-
+  vtkPainterPolyDataMapper *mapper = vtkPainterPolyDataMapper::SafeDownCast(this->Mapper);
+  vtkDefaultPainter *painter = vtkDefaultPainter::SafeDownCast(mapper->GetPainter());
+  this->MIPPainter->SetScalarsToColorsPainter(painter->GetScalarsToColorsPainter());
+  this->LODMIPPainter->SetScalarsToColorsPainter(painter->GetScalarsToColorsPainter());
   // override some settings made in GeometryRepresentation
 //  this->DeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
 //  this->LODDeliveryFilter->SetOutputDataType(VTK_POLY_DATA);

@@ -18,6 +18,7 @@
 #include "vtksys/ios/sstream"
 
 #include "vtkgl.h"
+#include "vtkMapper.h"
 #include "vtkActor.h"
 #include "vtkRenderer.h"
 #include "vtkPolyData.h"
@@ -44,6 +45,7 @@
 #include "vtkTimerLog.h"
 #include "vtkTransform.h"
 #include "vtkMPICompositeManager.h"
+#include "vtkScalarsToColorsPainter.h"
 //
 #ifdef VTK_USE_MPI
 #include "vtkMPICommunicator.h"
@@ -61,6 +63,7 @@
 //----------------------------------------------------------------------------
 vtkInstantiatorNewMacro(vtkMIPPainter);
 vtkCxxSetObjectMacro(vtkMIPPainter, Controller, vtkMultiProcessController);
+vtkCxxSetObjectMacro(vtkMIPPainter, ScalarsToColorsPainter, vtkScalarsToColorsPainter);
 //----------------------------------------------------------------------------
 
 template<typename T> class RGB_tuple
@@ -125,12 +128,18 @@ vtkMIPPainter *vtkMIPPainter::New()
 // ---------------------------------------------------------------------------
 vtkMIPPainter::vtkMIPPainter()
 {
-  this->TypeScalars      = NULL;
-  this->ActiveScalars    = NULL;
-  this->NumberOfParticleTypes = 0;
+  this->TypeScalars            = NULL;
+  this->ActiveScalars          = NULL;
+  this->NumberOfParticleTypes  = 0;
   this->SetNumberOfParticleTypes(1); 
-  this->Controller = NULL;
+  this->ScalarsToColorsPainter = NULL;
+  this->Controller             = NULL;
   this->SetController(vtkMultiProcessController::GetGlobalController());
+  //
+  this->ArrayName = NULL;
+  this->ArrayId = -1;
+  this->ArrayComponent = 0;
+  this->ArrayAccessMode = VTK_GET_ARRAY_BY_ID;
 }
 // ---------------------------------------------------------------------------
 vtkMIPPainter::~vtkMIPPainter()
@@ -198,6 +207,34 @@ int vtkMIPPainter::GetTypeActive(int ptype)
 {
   return this->TypeActive[ptype];
 }
+//-----------------------------------------------------------------------------
+void vtkMIPPainter::ProcessInformation(vtkInformation* info)
+{
+  if (info->Has(vtkScalarsToColorsPainter::SCALAR_MODE()))
+    {
+    this->SetScalarMode(info->Get(vtkScalarsToColorsPainter::SCALAR_MODE()));
+    }
+
+  if (info->Has(vtkScalarsToColorsPainter::ARRAY_ACCESS_MODE()))
+    {
+    this->SetArrayAccessMode(info->Get(vtkScalarsToColorsPainter::ARRAY_ACCESS_MODE()));
+    }
+
+  if (info->Has(vtkScalarsToColorsPainter::ARRAY_ID()))
+    {
+    this->SetArrayId(info->Get(vtkScalarsToColorsPainter::ARRAY_ID()));
+    }
+
+  if (info->Has(vtkScalarsToColorsPainter::ARRAY_NAME()))
+    {
+    this->SetArrayName(info->Get(vtkScalarsToColorsPainter::ARRAY_NAME()));
+    }
+
+  if (info->Has(vtkScalarsToColorsPainter::ARRAY_COMPONENT()))
+    {
+    this->SetArrayComponent(info->Get(vtkScalarsToColorsPainter::ARRAY_COMPONENT()));
+    }
+  }
 // ---------------------------------------------------------------------------
 void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor, 
   unsigned long typeflags, bool forceCompileOnly)
@@ -214,11 +251,18 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   vtkDataArray *ActiveArray = this->ActiveScalars ? 
     input->GetPointData()->GetArray(this->ActiveScalars) : NULL;  
 
-  int cellFlag = 0;
-  vtkDataArray *scalars = NULL;
+  this->ProcessInformation(this->Information);
+
 //  vtkAbstractMapper::
 //    GetScalars(this->GetInput(), this->ScalarMode, this->ArrayAccessMode,
 //               this->ArrayId, this->ArrayName, cellFlag);
+  vtkScalarsToColors *lut = this->ScalarsToColorsPainter->GetLookupTable();
+
+  int cellFlag=0;
+  vtkDataSet* ds = static_cast<vtkDataSet*>(input);
+  vtkDataArray* scalars = vtkAbstractMapper::GetScalars(ds,
+    this->ScalarMode, this->ArrayAccessMode, this->ArrayId,
+    this->ArrayName, cellFlag);
 
   //
   // if one process has no points, pts will be NULL
@@ -343,10 +387,15 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
           rgbVal.b = background.b;
         }
         else {
-          //unsigned char *rgba = this->LookupTable->MapValue(pixval);
-          //rgbVal.r = (rgba[0]/255.0);
-          //rgbVal.g = (rgba[1]/255.0);
-          //rgbVal.b = (rgba[2]/255.0);
+          unsigned char *rgba = lut->MapValue(pixval);
+          if (pixval>0) {
+            rgbVal.r = (rgba[0]/255.0);
+            rgbVal.g = (rgba[1]/255.0);
+            rgbVal.b = (rgba[2]/255.0);
+          }
+          rgbVal.r = (rgba[0]/255.0);
+          rgbVal.g = (rgba[1]/255.0);
+          rgbVal.b = (rgba[2]/255.0);
         }
       }
     }

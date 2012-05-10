@@ -27,6 +27,7 @@
 #include <vtkstd/string> // needed for our arrays
 
 class vtkMultiProcessController;
+class vtkScalarsToColorsPainter;
 
 class VTK_EXPORT vtkMIPPainter : public vtkPolyDataPainter
 {
@@ -67,6 +68,12 @@ public:
 //  void GetBounds(double *bounds);
 //  double *GetBounds();
 
+  // Description:
+  // The MIP Renderer needs to manually convert scalars to colours
+  // so we must have a copy of the painter used by the rest of the rendering pipeline
+  virtual void SetScalarsToColorsPainter(vtkScalarsToColorsPainter* ScalarsToColorsPainter);
+  vtkGetObjectMacro(ScalarsToColorsPainter, vtkScalarsToColorsPainter);
+
 //BTX
   // Description:
   // Set/Get the controller used for coordinating parallel writing
@@ -77,9 +84,20 @@ public:
   vtkGetObjectMacro(Controller, vtkMultiProcessController);
 //ETX
 
+  vtkSetMacro(ArrayAccessMode, int);
+  vtkSetMacro(ArrayId, int);
+  vtkSetStringMacro(ArrayName);
+  vtkSetMacro(ArrayComponent, int);
+  vtkSetMacro(ScalarMode, int);
+
 protected:
    vtkMIPPainter();
   ~vtkMIPPainter();
+
+  // Description:
+  // Called before RenderInternal() if the Information has been changed
+  // since the last time this method was called.
+  virtual void ProcessInformation(vtkInformation*);
 
 //  virtual int FillInputPortInformation(int port, vtkInformation *info);
 
@@ -88,7 +106,14 @@ protected:
   int               NumberOfParticleTypes;
   std::vector<int>  TypeActive;
 
-  vtkMultiProcessController* Controller;
+  vtkMultiProcessController *Controller;
+  vtkScalarsToColorsPainter *ScalarsToColorsPainter;
+
+  int ArrayAccessMode;
+  int ArrayComponent;
+  int ArrayId;
+  char* ArrayName;
+  int ScalarMode;
 
 private:
   vtkMIPPainter(const vtkMIPPainter&); // Not implemented.
