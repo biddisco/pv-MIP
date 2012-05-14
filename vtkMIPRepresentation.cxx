@@ -37,8 +37,10 @@ vtkMIPRepresentation::vtkMIPRepresentation()
 {
   this->MIPDefaultPainter    = vtkMIPDefaultPainter::New();
   this->LODMIPDefaultPainter = vtkMIPDefaultPainter::New();
-  this->MIPPainter           = vtkMIPPainter::New();
-  this->LODMIPPainter        = vtkMIPPainter::New();
+  this->MIPPainter           = this->MIPDefaultPainter->GetMIPPainter();
+  this->LODMIPPainter        = this->LODMIPDefaultPainter->GetMIPPainter();
+  this->MIPPainter->Register(this);
+  this->LODMIPPainter->Register(this);
   this->ActiveParticleType   = 0;
   this->ColorArrayName       = 0;
   this->ColorAttributeType   = POINT_DATA;
@@ -91,12 +93,10 @@ void vtkMIPRepresentation::SetupDefaults()
   vtkPainterPolyDataMapper* painterMapper = vtkPainterPolyDataMapper::SafeDownCast(this->Mapper);
   this->MIPDefaultPainter->SetDelegatePainter(painterMapper->GetPainter()->GetDelegatePainter());
   painterMapper->SetPainter(this->MIPDefaultPainter);
-  this->MIPDefaultPainter->SetMIPPainter(this->MIPPainter);
   // Setup LOD painters
   painterMapper = vtkPainterPolyDataMapper::SafeDownCast(this->LODMapper);
   this->LODMIPDefaultPainter->SetDelegatePainter(painterMapper->GetPainter()->GetDelegatePainter());
   painterMapper->SetPainter(this->LODMIPDefaultPainter);
-  this->LODMIPDefaultPainter->SetMIPPainter(this->LODMIPPainter);
 }
 
 //----------------------------------------------------------------------------

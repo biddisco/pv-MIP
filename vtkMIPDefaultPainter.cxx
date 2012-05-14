@@ -23,7 +23,7 @@ vtkCxxSetObjectMacro(vtkMIPDefaultPainter, MIPPainter, vtkMIPPainter);
 //----------------------------------------------------------------------------
 vtkMIPDefaultPainter::vtkMIPDefaultPainter()
 {
-  this->MIPPainter = NULL;
+  this->MIPPainter = vtkMIPPainter::New();
 }
 
 //----------------------------------------------------------------------------
