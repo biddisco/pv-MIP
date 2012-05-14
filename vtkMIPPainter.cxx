@@ -37,6 +37,7 @@
 #include "vtkLookupTable.h"
 #include "vtkMath.h"
 #include "vtkObjectFactory.h"
+#include "vtkPointSet.h"
 #include "vtkPointData.h"
 #include "vtkProperty.h"
 #include "vtkRenderWindow.h"
@@ -132,46 +133,24 @@ vtkMIPPainter::~vtkMIPPainter()
   delete []this->ActiveScalars;
 }
 // ---------------------------------------------------------------------------
-/*
-int vtkMIPPainter::FillInputPortInformation(int port,
-  vtkInformation *info)
+void vtkMIPPainter::UpdateBounds(double bounds[6])
 {
-  info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkPointSet");
-  return 1;
-}
-*/
-// ---------------------------------------------------------------------------
-//double *vtkMIPPainter::GetBounds()
-//{
-//  this->GetBounds(this->Bounds);
-//  return this->Bounds;
-//}
-// ---------------------------------------------------------------------------
-/*
-void vtkMIPPainter::GetBounds(double *bounds)
-{
+  vtkPointSet *input = vtkPointSet::SafeDownCast(this->GetInput());
+  // if it hasn't been set yet, abort.
+  if (!input) return;
+  input->GetBounds(bounds);
   //
-  // Define box...
-  //
-  this->GetInput()->GetBounds(bounds);
-  //
-#ifdef VTK_USE_MPI
-  vtkMPICommunicator *communicator = vtkMPICommunicator::SafeDownCast(
-    vtkMultiProcessController::GetGlobalController()->GetCommunicator());
-  if (communicator)
-  {
-    double mins[3] = {bounds[0], bounds[2], bounds[4]};
+  if (this->Controller) {
+    double mins[3]  = {bounds[0], bounds[2], bounds[4]};
     double maxes[3] = {bounds[1], bounds[3], bounds[5]};
     double globalMins[3], globalMaxes[3];
-    communicator->AllReduce(mins, globalMins, 3, vtkCommunicator::MIN_OP);
-    communicator->AllReduce(maxes, globalMaxes, 3, vtkCommunicator::MAX_OP);
+    this->Controller->AllReduce(mins, globalMins, 3, vtkCommunicator::MIN_OP);
+    this->Controller->AllReduce(maxes, globalMaxes, 3, vtkCommunicator::MAX_OP);
     bounds[0] = globalMins[0];  bounds[1] = globalMaxes[0];
     bounds[2] = globalMins[1];  bounds[3] = globalMaxes[1];
     bounds[4] = globalMins[2];  bounds[5] = globalMaxes[2];
   }
-#endif
 }
-*/
 // ---------------------------------------------------------------------------
 void vtkMIPPainter::SetNumberOfParticleTypes(int N)
 {
@@ -225,7 +204,10 @@ void vtkMIPPainter::ProcessInformation(vtkInformation* info)
 //-----------------------------------------------------------------------------
 typedef IceTUnsignedInt32       IceTEnum;
 typedef IceTInt32               IceTInt;
+typedef void *                  IceTContext;
 extern "C" ICET_EXPORT void icetGetIntegerv(IceTEnum pname, IceTInt *params);
+extern "C" ICET_EXPORT IceTContext icetGetContext(void);
+
 #define ICET_STATE_ENGINE_START (IceTEnum)0x00000000
 #define ICET_NUM_TILES          (ICET_STATE_ENGINE_START | (IceTEnum)0x0010)
 #define ICET_TILE_VIEWPORTS     (ICET_STATE_ENGINE_START | (IceTEnum)0x0011)
@@ -235,8 +217,6 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
 {
   int X = ren->GetSize()[0];
   int Y = ren->GetSize()[1];
-//  vtkDataSet *dsn = actor->GetMapper()->GetInput();
-//  vtkPointSet *input = vtkPointSet::SafeDownCast(actor->GetMapper()->GetInput());
   vtkDataObject *indo = this->GetInput();
   vtkPointSet *input = vtkPointSet::SafeDownCast(indo);
   vtkPoints *pts = input->GetPoints();
@@ -246,109 +226,68 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   //
   vtkDataArray *ActiveArray = this->ActiveScalars ? 
     input->GetPointData()->GetArray(this->ActiveScalars) : NULL;  
-
+  //
+  // Make sure we have the right color array and other info
+  //
   this->ProcessInformation(this->Information);
-
+  //
+  // Get the LUT and scalar array
+  //
   int cellFlag=0;
   vtkDataSet* ds = static_cast<vtkDataSet*>(input);
   vtkDataArray* scalars = vtkAbstractMapper::GetScalars(ds,
     this->ScalarMode, this->ArrayAccessMode, this->ArrayId,
     this->ArrayName, cellFlag);
-
-//  vtkAbstractMapper::
-//    GetScalars(this->GetInput(), this->ScalarMode, this->ArrayAccessMode,
-//               this->ArrayId, this->ArrayName, cellFlag);
   vtkScalarsToColors *lut = this->ScalarsToColorsPainter->GetLookupTable();
-
-
-  //
-  // if one process has no points, pts will be NULL
-  //
-  vtkIdType N = pts ? pts->GetNumberOfPoints() : 0;
-  double bounds[6];
-  input->GetBounds(bounds);
-  double length = input->GetLength();
-  double radius = N>0 ? length/N : length/1000.0;
-  
-
-  IceTInt ids;
-  icetGetIntegerv(ICET_NUM_TILES,&ids);
-  IceTInt *vp=new IceTInt[4*ids];
-  icetGetIntegerv(ICET_TILE_VIEWPORTS,vp);
+  // We need the viewport/viewsize scaled by the Image Reduction Factor when downsampling
+  // with client server. This is a nasty hack because we can't access this information
+  // directly.
+  // This is the reported size of final image, (which may be wrong)
+  int viewsize[2], vieworigin[2];
+  ren->GetTiledSizeAndOrigin( &viewsize[0],   &viewsize[1], 
+                              &vieworigin[0], &vieworigin[1] );
+  // Query IceT for the actual size
+  IceTInt ids, vp[32*4] = {0, 0, viewsize[0], viewsize[1],};
+  if (icetGetContext()!=NULL) {
+    icetGetIntegerv(ICET_NUM_TILES,&ids);
+    // when running on a single core, this returns nonsense
+    if (ids>0 && ids<32) {
+      icetGetIntegerv(ICET_TILE_VIEWPORTS,vp);
+    }
+  }
+  // Here we compute the actual viewport scaling factor with the correct adjusted sizes.
+  double viewPortRatio[2];
+  double *viewPort = ren->GetViewport();
+  viewPortRatio[0] = (vp[2]*(viewPort[2]-viewPort[0])) / 2.0 + viewsize[0]*viewPort[0];
+  viewPortRatio[1] = (vp[3]*(viewPort[3]-viewPort[1])) / 2.0 + viewsize[1]*viewPort[1];
 
   //
   // We need the transform that reflects the transform point coordinates according to actor's transformation matrix
   //
-  vtkCamera *cam = ren->GetActiveCamera();
-  double zmin,zmax;
-  ren->GetActiveCamera()->GetClippingRange(zmin, zmax);
+  vtkSmartPointer<vtkMatrix4x4> matrix = vtkSmartPointer<vtkMatrix4x4>::New();
+  matrix->DeepCopy(
+    ren->GetActiveCamera()->GetCompositeProjectionTransformMatrix(ren->GetTiledAspectRatio(),
+    0,1));
 
-  vtkMatrix4x4 *matrix = vtkMatrix4x4::New();
-  matrix->DeepCopy(ren->GetActiveCamera()
-    ->GetCompositeProjectionTransformMatrix(
-    ren->GetTiledAspectRatio(),0,1));
-
-  GLint  VV[4];
-  glGetIntegerv(GL_VIEWPORT, VV);
-
-  std::cout << VV[0] << " " << VV[1] << " " << VV[2] << " " << VV[3] << std::endl;
-
-  // size of final image
-  int viewsize[2], vieworigin[2];
-  ren->GetTiledSizeAndOrigin( &viewsize[0],   &viewsize[1], 
-                              &vieworigin[0], &vieworigin[1] );
+  //
+  // watch out, if one process has no points, pts array will be NULL
+  //
+  vtkIdType N = pts ? pts->GetNumberOfPoints() : 0;
   
-  // viewport info
-  double viewPortRatio[2];
-  double *viewPort = ren->GetViewport();
-  viewPortRatio[0] = (vp[2]*(viewPort[2]-viewPort[0])) / 2.0 +
-      viewsize[0]*viewPort[0];
-  viewPortRatio[1] = (vp[3]*(viewPort[3]-viewPort[1])) / 2.0 +
-      viewsize[1]*viewPort[1];
-
-/*
-    // WE CANNOT USE THIS WITH Ice-T
-//    vtkLinearTransform *viewCamera_Inv=r->GetActiveCamera()
-//      ->GetViewTransformObject()->GetLinearInverse();
-//    vtkBreakPoint::Break();
-    // REQUIRED with Ice-T
-    // We assume that at this point of the execution
-    // modelview matrix  is actually on the view matrix, that is
-    // model matrix is identity.
-
-    GLfloat m[16];
-    glGetFloatv(GL_MODELVIEW_MATRIX,m);
-    int row=0;
-    while(row<4)
-      {
-      int column=0;
-      while(column<4)
-        {
-        matrix->SetElement(row,column,static_cast<double>(m[column*4+row]));
-        ++column;
-        }
-      ++row;
-      }
-//    mat->Invert();
-//    vtkMatrixToLinearTransform *viewCamera_Inv
-//      =vtkMatrixToLinearTransform::New();
-//    viewCamera_Inv->SetInput(mat);
-
-*/
-
-
-
-
-
-  double view[4];
-  double pos[2];
-
+  //
+  // array of final MIP values, one per pixel of final image
+  //
   std::vector<double> mipValues(X*Y, VTK_DOUBLE_MIN);
+  //
+  // transform all points from world coordinates into viewport positions
+  //
+  double view[4], pos[2];
   for (vtkIdType i=0; i<N; i++) {
     // what particle type is this
     int ptype = TypeArray ? TypeArray->GetTuple1(i) : 0;
     // clamp it to prevent array access faults
     ptype = ptype<this->NumberOfParticleTypes ? ptype : 0;
+    
     // is this particle active, if not skip it
     bool active = this->TypeActive[ptype] && (ActiveArray ? (ActiveArray->GetTuple1(i)!=0) : 1);
     if (!active) continue;
@@ -394,13 +333,15 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     delete [] tuple;
   }
 
-    matrix->Delete();
-
+  //
+  // Now Gather results from all processes and perform the Max (or other) operation
+  //
   std::vector<double> mipCollected(X*Y, VTK_DOUBLE_MIN);
-//  this->Controller->AllReduce(&mipValues[0], &mipCollected[0]/*(double*)MPI_IN_PLACE*/, X*Y, vtkCommunicator::MAX_OP);
   this->Controller->Reduce(&mipValues[0], &mipCollected[0]/*(double*)MPI_IN_PLACE*/, X*Y, vtkCommunicator::MAX_OP, 0);
 
+  //
   // only convert to colours on master process
+  //
   if (this->Controller->GetLocalProcessId()==0) {
     //
     // create an RGB image buffer

@@ -33,10 +33,20 @@ vtkMIPDefaultPainter::~vtkMIPDefaultPainter()
 }
 
 //----------------------------------------------------------------------------
+void vtkMIPDefaultPainter::UpdateBounds(double bounds[6])
+{
+  if (this->MIPPainter->GetInput()!=this->GetInput()) {
+    this->MIPPainter->SetInput(this->GetInput());
+  }
+  this->MIPPainter->UpdateBounds(bounds);
+}
+
+//----------------------------------------------------------------------------
 void vtkMIPDefaultPainter::BuildPainterChain()
 {
   // Override painters we don't want.
   this->SetDisplayListPainter(NULL);
+  this->SetCompositePainter(NULL);
   this->SetCoincidentTopologyResolutionPainter(NULL);
   this->SetRepresentationPainter(NULL);
   // and set ours at the end of the chain

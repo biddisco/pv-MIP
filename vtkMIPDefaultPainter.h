@@ -42,6 +42,12 @@ public:
   void SetMIPPainter(vtkMIPPainter*);
   vtkGetObjectMacro(MIPPainter, vtkMIPPainter);
 
+  // Description:
+  // The MIP painter must return the complete bounds of the whole dataset
+  // not just the local 'piece', otherwise the compositing blanks out parts it thinks
+  // are not covered by any geometry.
+  void UpdateBounds(double bounds[6]);
+
 //BTX
 protected:
    vtkMIPDefaultPainter();

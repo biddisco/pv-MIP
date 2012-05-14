@@ -17,15 +17,19 @@
 //
 #include "vtksys/ios/sstream"
 //
-#include "vtkCompositePolyDataMapper2.h"
 #include "vtkDataObject.h"
 #include "vtkDefaultPainter.h"
 #include "vtkMIPPainter.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkObjectFactory.h"
+// we inherit changes to these filters from GeometryRepresentation
+#include "vtkPainterPolyDataMapper.h"
+#include "vtkPVCacheKeeper.h"
+#include "vtkPVUpdateSuppressor.h"
 #include "vtkPVLODActor.h"
-#include "vtkRenderer.h"
+#include "vtkUnstructuredDataDeliveryFilter.h"
+#include "vtkQuadricClustering.h"
 
 vtkStandardNewMacro(vtkMIPRepresentation);
 //----------------------------------------------------------------------------
@@ -40,23 +44,18 @@ vtkMIPRepresentation::vtkMIPRepresentation()
   this->ColorAttributeType   = POINT_DATA;
   this->Representation       = POINTS;
   this->Settings             = vtkSmartPointer<vtkStringArray>::New();
-  // Setup painters
-  vtkCompositePolyDataMapper2* compositeMapper = vtkCompositePolyDataMapper2::SafeDownCast(this->Mapper);
-  this->MIPDefaultPainter->SetDelegatePainter(compositeMapper->GetPainter()->GetDelegatePainter());
-  compositeMapper->SetPainter(this->MIPDefaultPainter);
-  this->MIPDefaultPainter->SetMIPPainter(this->MIPPainter);
-  // Setup LOD painters
-  compositeMapper = vtkCompositePolyDataMapper2::SafeDownCast(this->LODMapper);
-  this->LODMIPDefaultPainter->SetDelegatePainter(compositeMapper->GetPainter()->GetDelegatePainter());
-  compositeMapper->SetPainter(this->LODMIPDefaultPainter);
-  this->LODMIPDefaultPainter->SetMIPPainter(this->LODMIPPainter);
-
-  // Copied verbatim from example plugins:
-  // Not insanely thrilled about this API on vtkProp about properties, but oh
-  // well. We have to live with it.
-  vtkInformation* keys = vtkInformation::New();
-  this->Actor->SetPropertyKeys(keys);
-  keys->Delete();
+  //
+  // The default Painter based Mapper : vtkCompositePolyDataMapper2 does not
+  // pass the ComputeBounds through to the individual painters, so our screenspace
+  // compositing from IceT is not handled well. 
+  // Since we can't handle multiblock data anyway, use a PolyDataPainter mapper
+  //
+  this->Mapper->Delete();
+  this->LODMapper->Delete();
+  this->Mapper = vtkPainterPolyDataMapper::New();
+  this->LODMapper = vtkPainterPolyDataMapper::New();
+  //
+  this->SetupDefaults();
 }
 //----------------------------------------------------------------------------
 vtkMIPRepresentation::~vtkMIPRepresentation()
@@ -66,6 +65,40 @@ vtkMIPRepresentation::~vtkMIPRepresentation()
   this->MIPPainter->Delete();
   this->LODMIPPainter->Delete();
 }
+
+//----------------------------------------------------------------------------
+void vtkMIPRepresentation::SetupDefaults()
+{
+  // we changed the default Mapper so we must modify the connections affected
+  this->Mapper->SetInputConnection(this->UpdateSuppressor->GetOutputPort());
+  this->LODMapper->SetInputConnection(this->LODUpdateSuppressor->GetOutputPort());
+  // Actors
+  this->Actor->SetMapper(this->Mapper);
+  this->Actor->SetLODMapper(this->LODMapper);
+
+  // override some settings made in GeometryRepresentation to ensure we get points
+  // as output and don't bother copying stuff we don't need.
+  this->DeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
+  this->LODDeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
+  this->Decimator->SetCopyCellData(0);
+  // We don't want the MultiBlockMaker as we don't support multiblock
+  // connect the GeometryFilter to the CacheKeeper and bypass multiblockmaker.
+  // The MIPDefaultPainter removes the composite painter from the painter chain
+
+  this->CacheKeeper->SetInputConnection(this->GeometryFilter->GetOutputPort());
+
+  // Setup painters
+  vtkPainterPolyDataMapper* painterMapper = vtkPainterPolyDataMapper::SafeDownCast(this->Mapper);
+  this->MIPDefaultPainter->SetDelegatePainter(painterMapper->GetPainter()->GetDelegatePainter());
+  painterMapper->SetPainter(this->MIPDefaultPainter);
+  this->MIPDefaultPainter->SetMIPPainter(this->MIPPainter);
+  // Setup LOD painters
+  painterMapper = vtkPainterPolyDataMapper::SafeDownCast(this->LODMapper);
+  this->LODMIPDefaultPainter->SetDelegatePainter(painterMapper->GetPainter()->GetDelegatePainter());
+  painterMapper->SetPainter(this->LODMIPDefaultPainter);
+  this->LODMIPDefaultPainter->SetMIPPainter(this->LODMIPPainter);
+}
+
 //----------------------------------------------------------------------------
 int vtkMIPRepresentation::FillInputPortInformation(int port,
   vtkInformation *info)
