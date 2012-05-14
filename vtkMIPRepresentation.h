@@ -25,6 +25,7 @@
 #include "vtkSmartPointer.h"
 
 class vtkMIPPainter;
+class vtkMIPDefaultPainter;
 
 class VTK_EXPORT vtkMIPRepresentation : public vtkGeometryRepresentation
 {
@@ -72,8 +73,11 @@ protected:
   virtual int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*);
 
   //
-  vtkMIPPainter  *MIPPainter;
-  vtkMIPPainter  *LODMIPPainter;
+  vtkMIPPainter         *MIPPainter;
+  vtkMIPPainter         *LODMIPPainter;
+  vtkMIPDefaultPainter  *MIPDefaultPainter;
+  vtkMIPDefaultPainter  *LODMIPDefaultPainter;
+  //
 //  vtkMIPMapper          *MIPMapper;
 //  vtkMIPMapper          *LODMIPMapper;
   int                    ActiveParticleType;

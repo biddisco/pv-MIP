@@ -13,67 +13,58 @@
 
 =========================================================================*/
 #include "vtkMIPRepresentation.h"
-
+#include "vtkMIPDefaultPainter.h"
+//
 #include "vtksys/ios/sstream"
-
+//
 #include "vtkCompositePolyDataMapper2.h"
 #include "vtkDataObject.h"
 #include "vtkDefaultPainter.h"
 #include "vtkMIPPainter.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
-#include "vtkMPIMoveData.h"
 #include "vtkObjectFactory.h"
-#include "vtkPVArrowSource.h"
 #include "vtkPVLODActor.h"
-#include "vtkPVRenderView.h"
-#include "vtkQuadricClustering.h"
 #include "vtkRenderer.h"
-#include "vtkUnstructuredDataDeliveryFilter.h"
-#include "vtkOrderedCompositeDistributor.h"
-#include "vtkPVCacheKeeper.h"
 
 vtkStandardNewMacro(vtkMIPRepresentation);
 //----------------------------------------------------------------------------
 vtkMIPRepresentation::vtkMIPRepresentation()
 {
-  this->MIPPainter    = vtkMIPPainter::New();
-  this->LODMIPPainter = vtkMIPPainter::New();
+  this->MIPDefaultPainter    = vtkMIPDefaultPainter::New();
+  this->LODMIPDefaultPainter = vtkMIPDefaultPainter::New();
+  this->MIPPainter           = vtkMIPPainter::New();
+  this->LODMIPPainter        = vtkMIPPainter::New();
+  this->ActiveParticleType   = 0;
+  this->ColorArrayName       = 0;
+  this->ColorAttributeType   = POINT_DATA;
+  this->Representation       = POINTS;
+  this->Settings             = vtkSmartPointer<vtkStringArray>::New();
+  // Setup painters
+  vtkCompositePolyDataMapper2* compositeMapper = vtkCompositePolyDataMapper2::SafeDownCast(this->Mapper);
+  this->MIPDefaultPainter->SetDelegatePainter(compositeMapper->GetPainter()->GetDelegatePainter());
+  compositeMapper->SetPainter(this->MIPDefaultPainter);
+  this->MIPDefaultPainter->SetMIPPainter(this->MIPPainter);
+  // Setup LOD painters
+  compositeMapper = vtkCompositePolyDataMapper2::SafeDownCast(this->LODMapper);
+  this->LODMIPDefaultPainter->SetDelegatePainter(compositeMapper->GetPainter()->GetDelegatePainter());
+  compositeMapper->SetPainter(this->LODMIPDefaultPainter);
+  this->LODMIPDefaultPainter->SetMIPPainter(this->LODMIPPainter);
 
-  this->ActiveParticleType = 0;
-
-  vtkPainterPolyDataMapper::SafeDownCast(this->Mapper)->GetPainter()->SetDelegatePainter(this->MIPPainter);
-  vtkPainterPolyDataMapper::SafeDownCast(this->LODMapper)->GetPainter()->SetDelegatePainter(this->LODMIPPainter);
-  vtkPainterPolyDataMapper *mapper = vtkPainterPolyDataMapper::SafeDownCast(this->Mapper);
-  vtkDefaultPainter *painter = vtkDefaultPainter::SafeDownCast(mapper->GetPainter());
-  this->MIPPainter->SetScalarsToColorsPainter(painter->GetScalarsToColorsPainter());
-  this->LODMIPPainter->SetScalarsToColorsPainter(painter->GetScalarsToColorsPainter());
-  // override some settings made in GeometryRepresentation
-//  this->DeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
-//  this->LODDeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
-//  this->Decimator->SetCopyCellData(0);
-  //  we don't want the MultiBlockMaker used
-//  this->CacheKeeper->SetInputConnection(this->GeometryFilter->GetOutputPort());
-
-  this->ColorArrayName = 0;
-  this->ColorAttributeType = POINT_DATA;
-  this->Representation = POINTS;
-
+  // Copied verbatim from example plugins:
   // Not insanely thrilled about this API on vtkProp about properties, but oh
   // well. We have to live with it.
   vtkInformation* keys = vtkInformation::New();
   this->Actor->SetPropertyKeys(keys);
   keys->Delete();
-
-  Settings = vtkSmartPointer<vtkStringArray>::New();
-
 }
 //----------------------------------------------------------------------------
 vtkMIPRepresentation::~vtkMIPRepresentation()
 {
-  // Geometry Representation base class will delete the Mapper and LODMapper which point to our classes
-  this->MIPPainter = NULL;
-  this->LODMIPPainter = NULL;
+  this->MIPDefaultPainter->Delete();
+  this->LODMIPDefaultPainter->Delete();
+  this->MIPPainter->Delete();
+  this->LODMIPPainter->Delete();
 }
 //----------------------------------------------------------------------------
 int vtkMIPRepresentation::FillInputPortInformation(int port,
