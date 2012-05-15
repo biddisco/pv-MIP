@@ -49,6 +49,9 @@ void vtkMIPDefaultPainter::BuildPainterChain()
   this->SetCompositePainter(NULL);
   this->SetCoincidentTopologyResolutionPainter(NULL);
   this->SetRepresentationPainter(NULL);
+  // Lighting painter aborts render if no input, which locks up our collectives
+  this->SetLightingPainter(NULL);
+  this->SetClipPlanesPainter(NULL);
   // and set ours at the end of the chain
   this->SetDefaultPainterDelegate(this->MIPPainter);
   // allow superclass to pieces everything together
