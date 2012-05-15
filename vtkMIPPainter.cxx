@@ -260,6 +260,9 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   double *viewPort = ren->GetViewport();
   viewPortRatio[0] = (vp[2]*(viewPort[2]-viewPort[0])) / 2.0 + viewsize[0]*viewPort[0];
   viewPortRatio[1] = (vp[3]*(viewPort[3]-viewPort[1])) / 2.0 + viewsize[1]*viewPort[1];
+  // Oops, we must use the IceT sizes not the renderwindow sizes.
+  X = vp[2];
+  Y = vp[3];
 
   //
   // We need the transform that reflects the transform point coordinates according to actor's transformation matrix
