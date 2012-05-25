@@ -46,7 +46,9 @@
 #include "vtkTransform.h"
 #include "vtkScalarsToColorsPainter.h"
 #include "vtkCellArray.h"
-  //
+#include "vtkFloatArray.h"
+#include "vtkDoubleArray.h"
+//
 #ifdef VTK_USE_MPI
 #include "vtkMPICommunicator.h"
 #endif
@@ -198,6 +200,25 @@ void vtkMIPPainter::ProcessInformation(vtkInformation* info)
     this->SetArrayComponent(info->Get(vtkScalarsToColorsPainter::ARRAY_COMPONENT()));
     }
   }
+//----------------------------------------------------------------------------
+void FloatOrDoubleArrayPointer(vtkDataArray *dataarray, float *&F, double *&D) {
+  if (dataarray && vtkFloatArray::SafeDownCast(dataarray)) {
+    F = vtkFloatArray::SafeDownCast(dataarray)->GetPointer(0);
+    D = NULL;
+  }
+  if (dataarray && vtkDoubleArray::SafeDownCast(dataarray)) {
+    D = vtkDoubleArray::SafeDownCast(dataarray)->GetPointer(0);
+    F = NULL;
+  }
+  //
+  if (dataarray && !F && !D) {
+    vtkGenericWarningMacro(<< dataarray->GetName() << "must be float or double");
+  }
+}
+//----------------------------------------------------------------------------
+#define FloatOrDouble(F, D, index) F ? F[index] : D[index]
+#define FloatOrDoubleSet(F, D) ((F!=NULL) || (D!=NULL))
+//----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 // IceT is not exported by paraview, so rather than force lots of include dirs
 // and libs, just manually set some defs which will keep the compiler happy
@@ -276,6 +297,11 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   // watch out, if one process has no points, pts array will be NULL
   //
   vtkIdType N = pts ? pts->GetNumberOfPoints() : 0;
+  float *pointsF = NULL;
+  double *pointsD = NULL;
+  if (N>0) {
+    FloatOrDoubleArrayPointer(pts->GetData(), pointsF, pointsD);
+  }
   
   //
   // array of final MIP values, one per pixel of final image
@@ -284,20 +310,33 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   //
   // transform all points from world coordinates into viewport positions
   //
-  double view[4], pos[2];
+#pragma omp parallel for  
   for (vtkIdType i=0; i<N; i++) {
+    // for openmp, disable activeparticles
     // what particle type is this
-    int ptype = TypeArray ? TypeArray->GetTuple1(i) : 0;
+    int ptype = 0; // TypeArray ? TypeArray->GetTuple1(i) : 0;
     // clamp it to prevent array access faults
-    ptype = ptype<this->NumberOfParticleTypes ? ptype : 0;
+    // ptype = ptype<this->NumberOfParticleTypes ? ptype : 0;
     
     // is this particle active, if not skip it
-    bool active = this->TypeActive[ptype] && (ActiveArray ? (ActiveArray->GetTuple1(i)!=0) : 1);
-    if (!active) continue;
+//    bool active = this->TypeActive[ptype] && (ActiveArray ? (ActiveArray->GetTuple1(i)!=0) : 1);
+//    if (!active) continue;
 
     // if we are active, transform the point and do the mip comparison
-    double *p = pts->GetPoint(i);
+    //
+    double p[3];
+    if (pointsF) {
+      p[0] = pointsF[i*3+0];
+      p[1] = pointsF[i*3+1];
+      p[2] = pointsF[i*3+2];
+    }
+    else {
+      p[0] = pointsD[i*3+0];
+      p[1] = pointsD[i*3+1];
+      p[2] = pointsD[i*3+2];
+    }
 
+    double view[4], pos[2];
     // convert from world to view
     view[0] = p[0]*matrix->Element[0][0] + p[1]*matrix->Element[0][1] +
       p[2]*matrix->Element[0][2] + matrix->Element[0][3];
@@ -315,25 +354,27 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     int ix = static_cast<int>((pos[0] + 1.0) * viewPortRatio[0] + 0.5);
     int iy = static_cast<int>((pos[1] + 1.0) * viewPortRatio[1] + 0.5);
     int C = scalars ? scalars->GetNumberOfComponents() : 1;
-    double *tuple=new double[C];
+    double tuple[12]; // max tensor arrays size?
     bool magnitude = (C>1);
-    double scalar=0, mip;
+    double mip;
 
     if (ix>=0 && ix<X && iy>=0 && iy<Y) {
       if (scalars && !magnitude) {
-        scalar = scalars->GetTuple1(i);
+        scalars->GetTuple(i,tuple);
         mip = mipValues[ix + iy*X];
       }
       else if (scalars && magnitude) {
         scalars->GetTuple(i,tuple);
-        scalar = vtkMath::Norm(tuple,C);
+        tuple[0] = vtkMath::Norm(tuple,C);
         mip = mipValues[ix + iy*X];
       }
-      if (scalar>mip) {
-        mipValues[ix + iy*X] = scalar;
+      else { 
+        tuple[0] = 0;
+      }
+      if (tuple[0]>mip) {
+        mipValues[ix + iy*X] = tuple[0];
       }
     }
-    delete [] tuple;
   }
 
   //
@@ -356,6 +397,7 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     //
     RGB_tuple<double> background;
     ren->GetBackground(&background.r);
+#pragma omp parallel for  
     for (int ix=0; ix<X; ix++) {
       for (int iy=0; iy<Y; iy++) {
         double pixval = mipCollected[ix + iy*X];
