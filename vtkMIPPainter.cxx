@@ -45,6 +45,7 @@
 #include "vtkTimerLog.h"
 #include "vtkTransform.h"
 #include "vtkScalarsToColorsPainter.h"
+#include "vtkColorTransferFunction.h"
 #include "vtkCellArray.h"
 #include "vtkFloatArray.h"
 #include "vtkDoubleArray.h"
@@ -259,7 +260,7 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   vtkDataArray* scalars = vtkAbstractMapper::GetScalars(ds,
     this->ScalarMode, this->ArrayAccessMode, this->ArrayId,
     this->ArrayName, cellFlag);
-  vtkScalarsToColors *lut = this->ScalarsToColorsPainter->GetLookupTable();
+  vtkColorTransferFunction *lut = vtkColorTransferFunction::SafeDownCast(this->ScalarsToColorsPainter->GetLookupTable());
   // We need the viewport/viewsize scaled by the Image Reduction Factor when downsampling
   // with client server. This is a nasty hack because we can't access this information
   // directly.
@@ -310,6 +311,7 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   //
   // transform all points from world coordinates into viewport positions
   //
+  int C = scalars ? scalars->GetNumberOfComponents() : 1;
 #pragma omp parallel for  
   for (vtkIdType i=0; i<N; i++) {
     // for openmp, disable activeparticles
@@ -353,11 +355,11 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
 
     int ix = static_cast<int>((pos[0] + 1.0) * viewPortRatio[0] + 0.5);
     int iy = static_cast<int>((pos[1] + 1.0) * viewPortRatio[1] + 0.5);
-    int C = scalars ? scalars->GetNumberOfComponents() : 1;
     double tuple[12]; // max tensor arrays size?
     bool magnitude = (C>1);
     double mip;
-
+    
+    // plot the point if it exceeds the previous max value at that pixel
     if (ix>=0 && ix<X && iy>=0 && iy<Y) {
       if (scalars && !magnitude) {
         scalars->GetTuple(i,tuple);
@@ -390,38 +392,64 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     //
     // create an RGB image buffer
     //
-    std::vector< RGB_tuple<float> > mipImage(X*Y, RGB_tuple<float>(0,0,0));
+//    std::vector< RGB_tuple<float> > mipImage(X*Y, RGB_tuple<float>(0,0,0));
+    std::vector< RGB_tuple<unsigned char> > mipImageChar(X*Y, RGB_tuple<unsigned char>(0,0,0));
     //
     // map mipped scalar values to RGB colours using lookuptable
     // we do one lookup per final pixel, except empty pixels
     //
     RGB_tuple<double> background;
+    RGB_tuple<unsigned char> backgroundchar;
     ren->GetBackground(&background.r);
+    lut->SetNanColor(&background.r);
+    backgroundchar.r = static_cast<unsigned char>(background.r*255.0 +0.5);
+    backgroundchar.g = static_cast<unsigned char>(background.g*255.0 +0.5);
+    backgroundchar.b = static_cast<unsigned char>(background.b*255.0 +0.5);
+
+//#define LUT_METHOD 1
+#define OLD_METHOD 1
+#ifdef LUT_METHOD
+    double nan = vtkMath::Nan();
 #pragma omp parallel for  
     for (int ix=0; ix<X; ix++) {
       for (int iy=0; iy<Y; iy++) {
         double pixval = mipCollected[ix + iy*X];
-        RGB_tuple<float> &rgbVal = mipImage[ix + iy*X];
-        //
         if (pixval==VTK_DOUBLE_MIN) {
-          rgbVal.r = background.r;
-          rgbVal.g = background.g;
-          rgbVal.b = background.b;
-        }
-        else {
-          unsigned char *rgba = lut->MapValue(pixval);
-          if (pixval>0) {
-            rgbVal.r = (rgba[0]/255.0);
-            rgbVal.g = (rgba[1]/255.0);
-            rgbVal.b = (rgba[2]/255.0);
-          }
-          rgbVal.r = (rgba[0]/255.0);
-          rgbVal.g = (rgba[1]/255.0);
-          rgbVal.b = (rgba[2]/255.0);
+          mipCollected[ix + iy*X] = nan;
         }
       }
     }
+    std::vector< RGB_tuple<unsigned char> > mipImageChar(X*Y, RGB_tuple<unsigned char>(0,0,0));
+    lut->MapScalarsThroughTable2(&mipCollected[0], 
+                                 &mipImageChar[0].r,
+                                 VTK_DOUBLE, 
+                                 X*Y,
+                                 1,
+                                 VTK_RGB);
+#endif
 
+#ifdef OLD_METHOD
+#pragma omp parallel for  
+    for (int ix=0; ix<X; ix++) {
+      for (int iy=0; iy<Y; iy++) {
+        double pixval = mipCollected[ix + iy*X];
+        RGB_tuple<unsigned char> &rgbVal = mipImageChar[ix + iy*X];
+        //
+        if (pixval==VTK_DOUBLE_MIN) {
+          rgbVal.r = backgroundchar.r;
+          rgbVal.g = backgroundchar.g;
+          rgbVal.b = backgroundchar.b;
+        }
+        else {
+          // @TODO : not sure that MapValue is thread safe
+          unsigned char *rgba = lut->MapValue(pixval);
+          rgbVal.r = rgba[0];
+          rgbVal.g = rgba[1];
+          rgbVal.b = rgba[2];
+        }
+      }
+    }
+#endif
     //
     // copy to OpenGL image buffer
     //
@@ -438,8 +466,16 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     // we draw our image just in front of the back clipping plane, 
     // so all other geometry will appear in front of it.
     glRasterPos3f(0, 0, -0.99);
-    float *x0 = &mipImage[0].r;
-    glDrawPixels(X, Y, (GLenum)(GL_RGB), (GLenum)(GL_FLOAT), (GLvoid*)(x0));
+
+#ifdef OLD_METHOD
+    unsigned char *xx0 = &mipImageChar[0].r;    
+    glDrawPixels(X, Y, (GLenum)(GL_RGB), (GLenum)(GL_UNSIGNED_BYTE), (GLvoid*)(xx0));
+#endif
+
+#ifdef LUT_METHOD
+    unsigned char *xx0 = &mipImageChar[0].r;    
+    glDrawPixels(X, Y, (GLenum)(GL_RGB), (GLenum)(GL_UNSIGNED_BYTE), (GLvoid*)(xx0));
+#endif
 
     glMatrixMode( GL_MODELVIEW );   
     glPopMatrix();
