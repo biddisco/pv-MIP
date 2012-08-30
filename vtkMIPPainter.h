@@ -84,11 +84,15 @@ public:
   vtkGetObjectMacro(Controller, vtkMultiProcessController);
 //ETX
 
+  // some properties of the scalars to colours are protected, but we need them
+  // for our custom colour mapping
   vtkSetMacro(ArrayAccessMode, int);
   vtkSetMacro(ArrayId, int);
   vtkSetStringMacro(ArrayName);
   vtkSetMacro(ArrayComponent, int);
   vtkSetMacro(ScalarMode, int);
+  vtkSetVector2Macro(ScalarRange,double);
+  vtkSetMacro(UseLookupTableScalarRange,int);
 
   // Description:
   // The MIP painter must return the complete bounds of the whole dataset
@@ -120,6 +124,8 @@ protected:
   int ArrayId;
   char* ArrayName;
   int ScalarMode;
+  double ScalarRange[2];
+  int UseLookupTableScalarRange;
 
 private:
   vtkMIPPainter(const vtkMIPPainter&); // Not implemented.

@@ -128,6 +128,11 @@ vtkMIPPainter::vtkMIPPainter()
   this->ArrayId = -1;
   this->ArrayComponent = 0;
   this->ArrayAccessMode = VTK_GET_ARRAY_BY_ID;
+  //
+  this->ScalarMode = VTK_SCALAR_MODE_DEFAULT;
+  this->UseLookupTableScalarRange = 1; 
+  this->ScalarRange[0] = 0.0;
+  this->ScalarRange[1] = 1.0;
 }
 // ---------------------------------------------------------------------------
 vtkMIPPainter::~vtkMIPPainter()
@@ -176,9 +181,29 @@ int vtkMIPPainter::GetTypeActive(int ptype)
 //-----------------------------------------------------------------------------
 void vtkMIPPainter::ProcessInformation(vtkInformation* info)
 {
+  if (info->Has(vtkScalarsToColorsPainter::USE_LOOKUP_TABLE_SCALAR_RANGE()))
+    {
+    this->SetUseLookupTableScalarRange(info->Get(vtkScalarsToColorsPainter::USE_LOOKUP_TABLE_SCALAR_RANGE()));
+    }
+
+  if (info->Has(vtkScalarsToColorsPainter::SCALAR_RANGE()))
+    {
+    this->SetScalarRange(info->Get(vtkScalarsToColorsPainter::SCALAR_RANGE()));
+    }
+
   if (info->Has(vtkScalarsToColorsPainter::SCALAR_MODE()))
     {
     this->SetScalarMode(info->Get(vtkScalarsToColorsPainter::SCALAR_MODE()));
+    }
+
+  if (info->Has(vtkScalarsToColorsPainter::LOOKUP_TABLE()))
+    {
+    vtkScalarsToColors* lut = vtkScalarsToColors::SafeDownCast(
+      info->Get(vtkScalarsToColorsPainter::LOOKUP_TABLE()));
+    if (lut)
+      {
+      this->ScalarsToColorsPainter->SetLookupTable(lut);
+      } 
     }
 
   if (info->Has(vtkScalarsToColorsPainter::ARRAY_ACCESS_MODE()))
@@ -260,7 +285,14 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   vtkDataArray* scalars = vtkAbstractMapper::GetScalars(ds,
     this->ScalarMode, this->ArrayAccessMode, this->ArrayId,
     this->ArrayName, cellFlag);
-  vtkColorTransferFunction *lut = vtkColorTransferFunction::SafeDownCast(this->ScalarsToColorsPainter->GetLookupTable());
+  vtkScalarsToColors *lut = vtkScalarsToColors::SafeDownCast(this->ScalarsToColorsPainter->GetLookupTable());
+  if (!lut) {
+    this->ScalarsToColorsPainter->CreateDefaultLookupTable();
+    lut = vtkScalarsToColors::SafeDownCast(this->ScalarsToColorsPainter->GetLookupTable());
+  }
+  if (!this->UseLookupTableScalarRange) {
+    lut->SetRange(this->ScalarRange);
+  }
   // We need the viewport/viewsize scaled by the Image Reduction Factor when downsampling
   // with client server. This is a nasty hack because we can't access this information
   // directly.
@@ -401,7 +433,7 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     RGB_tuple<double> background;
     RGB_tuple<unsigned char> backgroundchar;
     ren->GetBackground(&background.r);
-    lut->SetNanColor(&background.r);
+//    lut->SetNanColor(&background.r);
     backgroundchar.r = static_cast<unsigned char>(background.r*255.0 +0.5);
     backgroundchar.g = static_cast<unsigned char>(background.g*255.0 +0.5);
     backgroundchar.b = static_cast<unsigned char>(background.b*255.0 +0.5);
