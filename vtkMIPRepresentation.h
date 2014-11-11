@@ -43,9 +43,9 @@ public:
   //**************************************************************************
   // Forwarded to vtkMIPMapper
   //**************************************************************************
-  virtual void SetInputArrayToProcess(int idx, int port, int connection,
-                              int fieldAssociation,
-                              const char *name);
+//  virtual void SetInputArrayToProcess(int idx, int port, int connection,
+//                              int fieldAssociation,
+//                              const char *name);
 
   void SetTypeScalars(const char *);
   void SetActiveScalars(const char *);

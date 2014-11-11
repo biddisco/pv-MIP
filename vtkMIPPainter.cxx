@@ -138,6 +138,7 @@ vtkMIPPainter::vtkMIPPainter()
 // ---------------------------------------------------------------------------
 vtkMIPPainter::~vtkMIPPainter()
 {
+  delete []this->ArrayName;
   delete []this->TypeScalars;
   delete []this->ActiveScalars;
 }
@@ -192,11 +193,6 @@ void vtkMIPPainter::ProcessInformation(vtkInformation* info)
     this->SetScalarRange(info->Get(vtkScalarsToColorsPainter::SCALAR_RANGE()));
     }
 
-  if (info->Has(vtkScalarsToColorsPainter::SCALAR_MODE()))
-    {
-    this->SetScalarMode(info->Get(vtkScalarsToColorsPainter::SCALAR_MODE()));
-    }
-
   if (info->Has(vtkScalarsToColorsPainter::LOOKUP_TABLE()))
     {
     vtkScalarsToColors* lut = vtkScalarsToColors::SafeDownCast(
@@ -205,6 +201,11 @@ void vtkMIPPainter::ProcessInformation(vtkInformation* info)
       {
       this->ScalarsToColorsPainter->SetLookupTable(lut);
       } 
+    }
+
+  if (info->Has(vtkScalarsToColorsPainter::SCALAR_MODE()))
+    {
+    this->SetScalarMode(info->Get(vtkScalarsToColorsPainter::SCALAR_MODE()));
     }
 
   if (info->Has(vtkScalarsToColorsPainter::ARRAY_ACCESS_MODE()))
@@ -226,22 +227,22 @@ void vtkMIPPainter::ProcessInformation(vtkInformation* info)
     {
     this->SetArrayComponent(info->Get(vtkScalarsToColorsPainter::ARRAY_COMPONENT()));
     }
+
   }
 //----------------------------------------------------------------------------
-void FloatOrDoubleArrayPointer(vtkDataArray *dataarray, float *&F, double *&D) {
-  if (dataarray && vtkFloatArray::SafeDownCast(dataarray)) {
-    F = vtkFloatArray::SafeDownCast(dataarray)->GetPointer(0);
-    D = NULL;
-  }
-  if (dataarray && vtkDoubleArray::SafeDownCast(dataarray)) {
-    D = vtkDoubleArray::SafeDownCast(dataarray)->GetPointer(0);
-    F = NULL;
-  }
-  //
-  if (dataarray && !F && !D) {
-    vtkGenericWarningMacro(<< dataarray->GetName() << "must be float or double");
-  }
-}
+void vtkMIP_FloatOrDoubleArrayPointer(vtkDataArray *dataarray, float *&F, double *&D) {
+  if (dataarray && vtkFloatArray::SafeDownCast(dataarray)) {                       
+    F = vtkFloatArray::SafeDownCast(dataarray)->GetPointer(0);                     
+    D = NULL;                                                                      
+  }                                                                                
+  if (dataarray && vtkDoubleArray::SafeDownCast(dataarray)) {                      
+    D = vtkDoubleArray::SafeDownCast(dataarray)->GetPointer(0);                    
+    F = NULL;                                                                      
+  }                                                                                
+  if (dataarray && !F && !D) {                                                     
+    vtkGenericWarningMacro(<< dataarray->GetName() << "must be float or double");  
+  }                                                                                
+}                                                                                  
 //----------------------------------------------------------------------------
 #define FloatOrDouble(F, D, index) F ? F[index] : D[index]
 #define FloatOrDoubleSet(F, D) ((F!=NULL) || (D!=NULL))
@@ -334,7 +335,7 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   float *pointsF = NULL;
   double *pointsD = NULL;
   if (N>0) {
-    FloatOrDoubleArrayPointer(pts->GetData(), pointsF, pointsD);
+    vtkMIP_FloatOrDoubleArrayPointer(pts->GetData(), pointsF, pointsD);
   }
   
   //

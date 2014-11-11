@@ -29,7 +29,6 @@
           <Property name="MIPActiveParticleType"/>
           <Property name="MIPActiveParticleSettings"/>
           <Property name="MIPTypeScalars"/>
-          <Property name="MIPActiveScalars"/>
         </ExposedProperties>
       </SubProxy>
     </Extension>
@@ -60,14 +59,13 @@
           <Property name="MIPActiveParticleType"/>
           <Property name="MIPActiveParticleSettings"/>
           <Property name="MIPTypeScalars"/>
-          <Property name="MIPActiveScalars"/>
         </ExposedProperties>
       </SubProxy>
     </Extension>
 
     <!-- ================================================================= -->
     <RepresentationProxy name="MIPRepresentation"    
-                         base_proxygroup="representations"      
+                         base_proxygroup="internal_representations"      
                          base_proxyname="SurfaceRepresentationBase"      
                          class="vtkMIPRepresentation"      
                          processes="client|dataserver|renderserver" >
@@ -113,26 +111,6 @@
         default_regex_delimiter=","
         default_regex="^[Tt]ype"
         label="Type Array">
-        <ArrayListDomain
-          name="array_list"
-          attribute_type="Scalars"
-          none_string="Not available"
-          input_domain_name="input_array">
-          <RequiredProperties>
-            <Property name="Input" function="Input"/>
-          </RequiredProperties>
-        </ArrayListDomain>
-      </StringVectorProperty>
-
-      <StringVectorProperty
-        name="MIPActiveScalars"
-        command="SetActiveScalars"
-        number_of_elements="1"
-        animateable="0"
-        default_values="Active"
-        default_regex_delimiter=","
-        default_regex="^[Aa]ctiveScalars"
-        label="Active flag Array">
         <ArrayListDomain
           name="array_list"
           attribute_type="Scalars"

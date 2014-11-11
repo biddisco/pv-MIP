@@ -28,7 +28,6 @@
 #include "vtkPVCacheKeeper.h"
 #include "vtkPVUpdateSuppressor.h"
 #include "vtkPVLODActor.h"
-#include "vtkUnstructuredDataDeliveryFilter.h"
 #include "vtkQuadricClustering.h"
 
 vtkStandardNewMacro(vtkMIPRepresentation);
@@ -42,8 +41,6 @@ vtkMIPRepresentation::vtkMIPRepresentation()
   this->MIPPainter->Register(this);
   this->LODMIPPainter->Register(this);
   this->ActiveParticleType   = 0;
-  this->ColorArrayName       = 0;
-  this->ColorAttributeType   = POINT_DATA;
   this->Representation       = POINTS;
   this->Settings             = vtkSmartPointer<vtkStringArray>::New();
   //
@@ -72,16 +69,16 @@ vtkMIPRepresentation::~vtkMIPRepresentation()
 void vtkMIPRepresentation::SetupDefaults()
 {
   // we changed the default Mapper so we must modify the connections affected
-  this->Mapper->SetInputConnection(this->UpdateSuppressor->GetOutputPort());
-  this->LODMapper->SetInputConnection(this->LODUpdateSuppressor->GetOutputPort());
+//  this->Mapper->SetInputConnection(this->UpdateSuppressor->GetOutputPort());
+//  this->LODMapper->SetInputConnection(this->LODUpdateSuppressor->GetOutputPort());
   // Actors
   this->Actor->SetMapper(this->Mapper);
   this->Actor->SetLODMapper(this->LODMapper);
 
   // override some settings made in GeometryRepresentation to ensure we get points
   // as output and don't bother copying stuff we don't need.
-  this->DeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
-  this->LODDeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
+//  this->DeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
+//  this->LODDeliveryFilter->SetOutputDataType(VTK_POLY_DATA);
   this->Decimator->SetCopyCellData(0);
   // We don't want the MultiBlockMaker as we don't support multiblock
   // connect the GeometryFilter to the CacheKeeper and bypass multiblockmaker.
@@ -93,6 +90,7 @@ void vtkMIPRepresentation::SetupDefaults()
   vtkPainterPolyDataMapper* painterMapper = vtkPainterPolyDataMapper::SafeDownCast(this->Mapper);
   this->MIPDefaultPainter->SetDelegatePainter(painterMapper->GetPainter()->GetDelegatePainter());
   painterMapper->SetPainter(this->MIPDefaultPainter);
+  painterMapper->SetInterpolateScalarsBeforeMapping(0);
   // Setup LOD painters
   painterMapper = vtkPainterPolyDataMapper::SafeDownCast(this->LODMapper);
   this->LODMIPDefaultPainter->SetDelegatePainter(painterMapper->GetPainter()->GetDelegatePainter());
@@ -162,14 +160,17 @@ int vtkMIPRepresentation::GetTypeActive()
   return this->MIPPainter->GetTypeActive(this->ActiveParticleType);
 }
 //----------------------------------------------------------------------------
+/*
 void vtkMIPRepresentation::SetInputArrayToProcess(
   int idx, int port, int connection, int fieldAssociation, const char *name)
 {
   switch (idx) {
-    case 0: this->SetTypeScalars(name); break;
+    case 0: this->SetArrayName(name); break;
     case 1: this->SetActiveScalars(name); break;
+    case 2: this->SetTypeScalars(name); break;
   }
 }
+*/
 //----------------------------------------------------------------------------
 void vtkMIPRepresentation::SetTypeScalars(const char *s)
 {

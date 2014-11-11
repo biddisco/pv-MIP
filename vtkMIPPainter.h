@@ -23,8 +23,8 @@
 
 #include "vtkPolyDataPainter.h"
 
-#include <vtkstd/vector> // needed for our arrays
-#include <vtkstd/string> // needed for our arrays
+#include <vector> // needed for our arrays
+#include <string> // needed for our arrays
 
 class vtkMultiProcessController;
 class vtkScalarsToColorsPainter;
