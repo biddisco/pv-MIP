@@ -55,7 +55,7 @@ void vtkMIPDefaultPainter::BuildPainterChain()
   // core MIP render code, so we will pass it through.
   // NB. the MIP handles scalar mapping specially.
   this->MIPPainter->SetScalarsToColorsPainter(this->GetScalarsToColorsPainter());
-  this->SetScalarsToColorsPainter(NULL);
+//  this->SetScalarsToColorsPainter(NULL);
   // Lighting painter aborts render if no input, which locks up our collectives
   this->SetLightingPainter(NULL);
   this->SetClipPlanesPainter(NULL);
