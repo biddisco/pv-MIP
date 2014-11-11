@@ -46,6 +46,7 @@
 #include "vtkTransform.h"
 #include "vtkScalarsToColorsPainter.h"
 #include "vtkColorTransferFunction.h"
+#include "vtkDiscretizableColorTransferFunction.h"
 #include "vtkCellArray.h"
 #include "vtkFloatArray.h"
 #include "vtkDoubleArray.h"
@@ -285,13 +286,13 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
   vtkDataArray* scalars = vtkAbstractMapper::GetScalars(ds,
     this->ScalarMode, this->ArrayAccessMode, this->ArrayId,
     this->ArrayName, cellFlag);
-  vtkScalarsToColors *lut = vtkScalarsToColors::SafeDownCast(this->ScalarsToColorsPainter->GetLookupTable());
-  if (!lut) {
+  vtkScalarsToColors *s2c = this->ScalarsToColorsPainter->GetLookupTable();
+  if (!s2c) {
     this->ScalarsToColorsPainter->CreateDefaultLookupTable();
-    lut = vtkScalarsToColors::SafeDownCast(this->ScalarsToColorsPainter->GetLookupTable());
+    s2c = vtkScalarsToColors::SafeDownCast(this->ScalarsToColorsPainter->GetLookupTable());
   }
   if (!this->UseLookupTableScalarRange) {
-    lut->SetRange(this->ScalarRange);
+    s2c->SetRange(this->ScalarRange);
   }
   // We need the viewport/viewsize scaled by the Image Reduction Factor when downsampling
   // with client server. This is a nasty hack because we can't access this information
@@ -425,7 +426,6 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     // create an RGB image buffer
     //
 //    std::vector< RGB_tuple<float> > mipImage(X*Y, RGB_tuple<float>(0,0,0));
-    std::vector< RGB_tuple<unsigned char> > mipImageChar(X*Y, RGB_tuple<unsigned char>(0,0,0));
     //
     // map mipped scalar values to RGB colours using lookuptable
     // we do one lookup per final pixel, except empty pixels
@@ -433,7 +433,9 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
     RGB_tuple<double> background;
     RGB_tuple<unsigned char> backgroundchar;
     ren->GetBackground(&background.r);
-//    lut->SetNanColor(&background.r);
+    if (vtkColorTransferFunction::SafeDownCast(s2c)) {
+      vtkColorTransferFunction::SafeDownCast(s2c)->SetNanColor(&background.r);
+    }
     backgroundchar.r = static_cast<unsigned char>(background.r*255.0 +0.5);
     backgroundchar.g = static_cast<unsigned char>(background.g*255.0 +0.5);
     backgroundchar.b = static_cast<unsigned char>(background.b*255.0 +0.5);
@@ -452,7 +454,7 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
       }
     }
     std::vector< RGB_tuple<unsigned char> > mipImageChar(X*Y, RGB_tuple<unsigned char>(0,0,0));
-    lut->MapScalarsThroughTable2(&mipCollected[0], 
+    s2c->MapScalarsThroughTable2(&mipCollected[0], 
                                  &mipImageChar[0].r,
                                  VTK_DOUBLE, 
                                  X*Y,
@@ -461,6 +463,9 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
 #endif
 
 #ifdef OLD_METHOD
+    std::vector< RGB_tuple<unsigned char> > mipImageChar(X*Y, RGB_tuple<unsigned char>(0,0,0));
+    // call before entering openMP block to ensure thread safe build first time
+    s2c->Build();
 #pragma omp parallel for  
     for (int ix=0; ix<X; ix++) {
       for (int iy=0; iy<Y; iy++) {
@@ -473,11 +478,19 @@ void vtkMIPPainter::Render(vtkRenderer* ren, vtkActor* actor,
           rgbVal.b = backgroundchar.b;
         }
         else {
-          // @TODO : not sure that MapValue is thread safe
-          unsigned char *rgba = lut->MapValue(pixval);
+          // @TODO : MapValue appears to be thread safe if s2c is a vtkDiscretizableColorTransferFunction
+          unsigned char *rgba = s2c->MapValue(pixval);
           rgbVal.r = rgba[0];
           rgbVal.g = rgba[1];
           rgbVal.b = rgba[2];
+/*
+          // @TODO : not sure that MapValue is thread safe
+          double rgb[3];
+          s2c->vtkScalarsToColors::GetColor(pixval, rgb);
+          rgbVal.r = static_cast<unsigned char>(rgb[0]*255 + 0.5);
+          rgbVal.g = static_cast<unsigned char>(rgb[1]*255 + 0.5);
+          rgbVal.b = static_cast<unsigned char>(rgb[2]*255 + 0.5);
+*/
         }
       }
     }
