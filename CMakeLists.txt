@@ -109,7 +109,19 @@ TARGET_LINK_LIBRARIES(${PLUGIN_NAME}
     ${MPI_LIBRARY}
 )
 
-SET_TARGET_PROPERTIES(${PLUGIN_NAME} PROPERTIES COMPILE_FLAGS "${OpenMP_CXX_FLAGS}")
+#-----------------------------------------------------------------------------
+# OpenMP
+#-----------------------------------------------------------------------------
+OPTION(PV_MIP_USE_OPENMP "Compile pv-MIP with OpenMP support" ON)
+IF (PV_MIP_USE_OPENMP)
+  ADD_DEFINITIONS(-DHAVE_OPENMP)
+  SET(PV_MIP_OPENMP_CXX_FLAGS "")
+  IF (WIN32 AND MSVC) 
+    SET(PV_MIP_OPENMP_CXX_FLAGS "/openmp")
+  ENDIF (WIN32 AND MSVC) 
+ENDIF (PV_MESHLESS_USE_OPENMP)
+
+SET_TARGET_PROPERTIES(${PLUGIN_NAME} PROPERTIES COMPILE_FLAGS "${PV_MIP_OPENMP_CXX_FLAGS}")
 
 #--------------------------------------------------------
 # Create the UsePackage configuration for other projects
