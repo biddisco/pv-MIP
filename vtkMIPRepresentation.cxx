@@ -15,7 +15,7 @@
 #include "vtkMIPRepresentation.h"
 #include "vtkMIPDefaultPainter.h"
 //
-#include "vtksys/ios/sstream"
+#include <sstream>
 //
 #include "vtkDataObject.h"
 #include "vtkDefaultPainter.h"
@@ -130,7 +130,7 @@ void vtkMIPRepresentation::SetActiveParticleType(int p)
 //----------------------------------------------------------------------------
 template <typename T>
 std::string NumToStr(T data) {
-  vtksys_ios::ostringstream oss;
+  std::ostringstream oss;
 //  oss.setf(0,ios::floatfield);
   oss.precision(5);  
   oss << data;

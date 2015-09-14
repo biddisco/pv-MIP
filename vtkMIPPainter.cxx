@@ -15,8 +15,6 @@
 
 #include "vtkMIPPainter.h"
 
-#include "vtksys/ios/sstream"
-
 #include "vtkgl.h"
 #include "vtkMapper.h"
 #include "vtkActor.h"
